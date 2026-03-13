@@ -1,3 +1,12 @@
+"use client";
+
+import { useState } from "react";
+
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -5,21 +14,75 @@ import {
   FieldDescription,
   FieldGroup,
   FieldLabel,
-  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import { loginWithEmailPassword, sendPasswordReset } from "@/services/auth";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isVerificationSent = searchParams.get("verification") === "sent";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResetLoading, setIsResetLoading] = useState(false);
+
+  const handlePasswordReset = async () => {
+    setErrorMessage(null);
+    setInfoMessage(null);
+    setIsResetLoading(true);
+
+    try {
+      await sendPasswordReset(email);
+      setInfoMessage("Password reset email sent. Please check your inbox.");
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("Unable to send password reset email.");
+      }
+    } finally {
+      setIsResetLoading(false);
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setErrorMessage(null);
+    setInfoMessage(null);
+
+    if (!email.trim() || !password) {
+      setErrorMessage("Please enter your email and password.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      await loginWithEmailPassword(email.trim(), password);
+      router.push("/overview");
+    } catch (error) {
+      if (error instanceof Error) {
+        setErrorMessage(error.message);
+      } else {
+        setErrorMessage("Unable to login. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0">
         <CardContent className="grid p-0 md:grid-cols-2">
-          <form className="p-6 md:p-8">
+          <form className="p-6 md:p-8" onSubmit={handleSubmit}>
             <FieldGroup>
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Welcome back</h1>
@@ -27,33 +90,63 @@ export function LoginForm({
                   Login to your Acme Inc account
                 </p>
               </div>
+              {isVerificationSent ? (
+                <Alert>
+                  <AlertDescription>
+                    Verification email sent. Please verify your email address
+                    before logging in.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
+              {infoMessage ? (
+                <Alert>
+                  <AlertDescription>{infoMessage}</AlertDescription>
+                </Alert>
+              ) : null}
+              {errorMessage ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              ) : null}
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
                   id="email"
                   type="email"
                   placeholder="m@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                   required
                 />
               </Field>
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor="password">Password</FieldLabel>
-                  <a
-                    href="#"
+                  <button
+                    type="button"
+                    onClick={handlePasswordReset}
+                    disabled={isResetLoading}
                     className="ml-auto text-sm underline-offset-2 hover:underline"
                   >
-                    Forgot your password?
-                  </a>
+                    {isResetLoading
+                      ? "Sending reset email..."
+                      : "Forgot your password?"}
+                  </button>
                 </div>
-                <Input id="password" type="password" required />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
               </Field>
               <Field>
-                <Button type="button">
-                  <Link href="/overview">Login</Link>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? "Logging in..." : "Login"}
                 </Button>
               </Field>
-              <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+              {/* <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
                 Or continue with
               </FieldSeparator>
               <Field className="grid grid-cols-3 gap-4">
@@ -84,17 +177,19 @@ export function LoginForm({
                   </svg>
                   <span className="sr-only">Login with Meta</span>
                 </Button>
-              </Field>
+              </Field> */}
               <FieldDescription className="text-center">
-                Don&apos;t have an account? <a href="#">Sign up</a>
+                Don&apos;t have an account? <Link href="/signup">Sign up</Link>
               </FieldDescription>
             </FieldGroup>
           </form>
           <div className="relative hidden bg-muted md:block">
-            <img
+            <Image
               src="/placeholder.svg"
               alt="Image"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+              fill
+              sizes="(min-width: 768px) 50vw, 100vw"
+              className="object-cover dark:brightness-[0.2] dark:grayscale"
             />
           </div>
         </CardContent>

@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { BalanceFab } from "@/components/balance-fab";
 import "./globals.css";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -38,6 +39,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {children}
+        <BalanceFab />
       </body>
     </html>
   );

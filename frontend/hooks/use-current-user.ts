@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { doc, getDoc, getFirestore } from "firebase/firestore";
+import { doc, getFirestore, onSnapshot } from "firebase/firestore";
 
 import { isFirebaseConfigured } from "@/lib/firebase";
 import type { AppUser } from "@/types/user";
@@ -11,23 +11,6 @@ export interface CurrentUserState {
   user: AppUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-}
-
-async function resolveUserName(userId: string): Promise<string> {
-  try {
-    const db = getFirestore();
-    const snapshot = await getDoc(doc(db, "users", userId));
-    if (snapshot.exists()) {
-      const data = snapshot.data();
-      if (typeof data.username === "string" && data.username.trim().length > 0) {
-        return data.username;
-      }
-    }
-  } catch {
-    return userId;
-  }
-
-  return userId;
 }
 
 export function useCurrentUser(): CurrentUserState {
@@ -42,23 +25,32 @@ export function useCurrentUser(): CurrentUserState {
     }
 
     const auth = getAuth();
+    let unsubscribeUserDoc: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+        unsubscribeUserDoc = null;
+      }
+
       if (!firebaseUser) {
         setUser(null);
         setIsLoading(false);
         return;
       }
 
-      void (async () => {
-        try {
-          const db = getFirestore();
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      const db = getFirestore();
+      const userRef = doc(db, "users", firebaseUser.uid);
+
+      unsubscribeUserDoc = onSnapshot(
+        userRef,
+        (snapshot) => {
           let resolvedName = firebaseUser.uid;
           let balance = 0;
-          let freezed_balance = 0;
+          let freezedBalance = 0;
 
-          if (userDoc.exists()) {
-            const data = userDoc.data();
+          if (snapshot.exists()) {
+            const data = snapshot.data();
             if (typeof data.username === "string" && data.username.trim().length > 0) {
               resolvedName = data.username;
             }
@@ -66,7 +58,7 @@ export function useCurrentUser(): CurrentUserState {
               balance = data.balance;
             }
             if (typeof data.freezed_balance === "number") {
-              freezed_balance = data.freezed_balance;
+              freezedBalance = data.freezed_balance;
             }
           }
 
@@ -75,22 +67,29 @@ export function useCurrentUser(): CurrentUserState {
             name: resolvedName,
             email: firebaseUser.email ?? "",
             balance,
-            freezed_balance
+            freezed_balance: freezedBalance,
           });
-        } catch {
+          setIsLoading(false);
+        },
+        () => {
           setUser({
             id: firebaseUser.uid,
             name: firebaseUser.uid,
             email: firebaseUser.email ?? "",
             balance: 0,
-            freezed_balance: 0
+            freezed_balance: 0,
           });
+          setIsLoading(false);
         }
-        setIsLoading(false);
-      })();
+      );
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+      }
+      unsubscribe();
+    };
   }, []);
 
   return {

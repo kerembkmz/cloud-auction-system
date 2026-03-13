@@ -155,11 +155,12 @@ export function SignupForm({
           </form>
           <div className="relative hidden bg-muted md:block">
             <Image
-              src="/placeholder.svg"
+              src="/login-img.jpg"
               alt="Image"
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover dark:brightness-[0.2] dark:grayscale"
+              style={{ objectPosition: 'center 60%' }}
             />
           </div>
         </CardContent>

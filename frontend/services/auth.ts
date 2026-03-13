@@ -159,3 +159,16 @@ export async function sendPasswordReset(email: string): Promise<void> {
     throw new Error(getAuthErrorMessage(error));
   }
 }
+
+export async function logout(): Promise<void> {
+  if (!isFirebaseConfigured) {
+    throw new Error("Firebase is not configured. Add your env variables.");
+  }
+
+  try {
+    const auth = getAuth();
+    await signOut(auth);
+  } catch (error) {
+    throw new Error(getAuthErrorMessage(error));
+  }
+}

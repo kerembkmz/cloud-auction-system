@@ -24,7 +24,8 @@ async function resolveUserName(userId: string): Promise<string> {
       }
     }
   } catch {
-    return new ErrorEvent("Failed to resolve user name");
+    // Return userId as fallback
+    return userId;
   }
 
   return userId;
@@ -56,6 +57,7 @@ export function useCurrentUser(): CurrentUserState {
           id: firebaseUser.uid,
           name: resolvedName,
           email: firebaseUser.email ?? "",
+          avatar: firebaseUser.photoURL ?? "",
         });
         setIsLoading(false);
       })();

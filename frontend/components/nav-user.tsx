@@ -21,18 +21,33 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { DotsThreeVerticalIcon, UserCircleIcon, CreditCardIcon, BellIcon, SignOutIcon } from "@phosphor-icons/react"
+import { useCurrentUser } from "@/hooks/use-current-user"
+import { logout } from "@/services/auth"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string
-    email: string
-    avatar: string
-  }
-}) {
+export function NavUser() {
+  const { user, isLoading } = useCurrentUser()
   const { isMobile } = useSidebar()
+  const router = useRouter()
+
+  if (isLoading || !user) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton size="lg" disabled>
+            <Avatar className="size-8 rounded-lg grayscale">
+              <AvatarFallback className="rounded-lg">...</AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-medium">Loading...</span>
+            </div>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
+  }
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -78,7 +93,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/account")}>
                 <UserCircleIcon
                 />
                 Account
@@ -96,7 +111,7 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onClick={() => logout()}>
               <SignOutIcon
               />
               Log out

@@ -26,6 +26,10 @@ function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 function getAuthErrorMessage(error: unknown): string {
   if (!(error instanceof FirebaseError)) {
     if (error instanceof Error) {
@@ -94,11 +98,16 @@ export async function registerWithEmailPassword(
   }
 
   const normalizedUsername = normalizeUsername(username);
+  const normalizedEmail = normalizeEmail(email);
 
   if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
     throw new Error(
       "Username must be 3-20 characters and use only letters, numbers, or underscores.",
     );
+  }
+
+  if (!normalizedEmail) {
+    throw new Error("Please enter a valid email address.");
   }
 
   const db = getFirestore();
@@ -118,7 +127,7 @@ export async function registerWithEmailPassword(
     const auth = getAuth();
     const credential = await createUserWithEmailAndPassword(
       auth,
-      email,
+      normalizedEmail,
       password,
     );
     const user = credential.user;
@@ -127,7 +136,7 @@ export async function registerWithEmailPassword(
     try {
       await setDoc(userRef, {
         uid: user.uid,
-        email: user.email,
+        email: normalizedEmail,
         username: normalizedUsername,
         createdAt: serverTimestamp(),
         balance: 0,
@@ -149,13 +158,28 @@ export async function sendPasswordReset(email: string): Promise<void> {
     throw new Error("Firebase is not configured. Add your env variables.");
   }
 
-  if (!email.trim()) {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
     throw new Error("Please enter your email address first.");
   }
 
   try {
+    const db = getFirestore();
+    const usersRef = collection(db, "users");
+    const emailQuery = query(
+      usersRef,
+      where("email", "==", normalizedEmail),
+      limit(1),
+    );
+    const existingUser = await getDocs(emailQuery);
+
+    if (existingUser.empty) {
+      throw new Error("No account exists with this email address.");
+    }
+
     const auth = getAuth();
-    await sendPasswordResetEmail(auth, email.trim());
+    await sendPasswordResetEmail(auth, normalizedEmail);
   } catch (error) {
     throw new Error(getAuthErrorMessage(error));
   }

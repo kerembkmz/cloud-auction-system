@@ -26,6 +26,7 @@ export function LoginForm({
   const router = useRouter();
   const searchParams = useSearchParams();
   const isVerificationSent = searchParams.get("verification") === "sent";
+  const redirectTo = searchParams.get("redirect") || "/overview";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -66,7 +67,7 @@ export function LoginForm({
 
     try {
       await loginWithEmailPassword(email.trim(), password);
-      router.push("/overview");
+      router.push(redirectTo);
     } catch (error) {
       if (error instanceof Error) {
         setErrorMessage(error.message);

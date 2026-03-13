@@ -215,6 +215,8 @@ interface User {
   email: string;
   displayName: string;
   createdAt: Timestamp;
+  balance: number;
+  freezed_balance: number;
 }
 
 // auctions collection

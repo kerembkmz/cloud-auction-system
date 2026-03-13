@@ -24,7 +24,7 @@ async function resolveUserName(userId: string): Promise<string> {
       }
     }
   } catch {
-    return new ErrorEvent("Failed to resolve user name");
+    return userId;
   }
 
   return userId;
@@ -50,13 +50,42 @@ export function useCurrentUser(): CurrentUserState {
       }
 
       void (async () => {
-        const resolvedName = await resolveUserName(firebaseUser.uid);
+        try {
+          const db = getFirestore();
+          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          let resolvedName = firebaseUser.uid;
+          let balance = 0;
+          let freezed_balance = 0;
 
-        setUser({
-          id: firebaseUser.uid,
-          name: resolvedName,
-          email: firebaseUser.email ?? "",
-        });
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            if (typeof data.username === "string" && data.username.trim().length > 0) {
+              resolvedName = data.username;
+            }
+            if (typeof data.balance === "number") {
+              balance = data.balance;
+            }
+            if (typeof data.freezed_balance === "number") {
+              freezed_balance = data.freezed_balance;
+            }
+          }
+
+          setUser({
+            id: firebaseUser.uid,
+            name: resolvedName,
+            email: firebaseUser.email ?? "",
+            balance,
+            freezed_balance
+          });
+        } catch {
+          setUser({
+            id: firebaseUser.uid,
+            name: firebaseUser.uid,
+            email: firebaseUser.email ?? "",
+            balance: 0,
+            freezed_balance: 0
+          });
+        }
         setIsLoading(false);
       })();
     });

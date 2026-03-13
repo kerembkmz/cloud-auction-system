@@ -21,6 +21,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { DotsThreeVerticalIcon, UserCircleIcon, CreditCardIcon, BellIcon, SignOutIcon } from "@phosphor-icons/react"
+import Link from "next/link"
 
 export function NavUser({
   user,
@@ -82,11 +83,12 @@ export function NavUser({
                 />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
+              <Link href="/payment" className="block">
+                <DropdownMenuItem>
+                  <CreditCardIcon />
+                  Add Balance
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuItem>
                 <BellIcon
                 />

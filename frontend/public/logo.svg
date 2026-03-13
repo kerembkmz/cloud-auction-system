@@ -1,0 +1,62 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Cloud Gradient -->
+    <linearGradient id="cloudBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0f2fe" />
+      <stop offset="100%" stop-color="#7dd3fc" />
+    </linearGradient>
+    <!-- Foreground Cloud Gradient -->
+    <linearGradient id="cloudFg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+    <!-- Hammer/Gavel Gradient -->
+    <linearGradient id="hammer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#b45309" />
+    </linearGradient>
+    <!-- Drop shadow for depth -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="10" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Back Cloud (Light Blue) -->
+  <g filter="url(#shadow)">
+    <!-- Base geometric shapes blending into a cloud -->
+    <circle cx="190" cy="240" r="90" fill="url(#cloudBg)" />
+    <circle cx="340" cy="210" r="110" fill="url(#cloudBg)" />
+    <circle cx="270" cy="180" r="120" fill="url(#cloudBg)" />
+    <!-- Connective tissue -->
+    <rect x="180" y="150" width="160" height="170" fill="url(#cloudBg)" />
+    <rect x="130" y="210" width="280" height="120" rx="60" fill="url(#cloudBg)" />
+  </g>
+
+  <!-- Front Cloud (Darker Blue) -->
+  <g filter="url(#shadow)">
+    <circle cx="210" cy="300" r="70" fill="url(#cloudFg)" />
+    <circle cx="330" cy="290" r="80" fill="url(#cloudFg)" />
+    <circle cx="270" cy="260" r="100" fill="url(#cloudFg)" />
+    <!-- Connective tissue -->
+    <rect x="200" y="260" width="130" height="110" fill="url(#cloudFg)" />
+    <rect x="160" y="290" width="230" height="80" rx="40" fill="url(#cloudFg)" />
+  </g>
+
+  <!-- Auction Gavel -->
+  <g transform="translate(256, 256) rotate(-35) translate(-256, -256)" filter="url(#shadow)">
+    <!-- Mallet Handle -->
+    <rect x="236" y="130" width="40" height="240" rx="20" fill="url(#hammer)" />
+    <!-- Mallet Head -->
+    <rect x="196" y="100" width="120" height="70" rx="15" fill="url(#hammer)" />
+    <!-- Mallet Accent Details / Hammer bands -->
+    <rect x="186" y="115" width="10" height="40" rx="4" fill="#fef3c7" opacity="0.8" />
+    <rect x="316" y="115" width="10" height="40" rx="4" fill="#fef3c7" opacity="0.8" />
+    
+    <!-- Grip lines -->
+    <rect x="236" y="260" width="40" height="10" fill="#78350f" opacity="0.3" />
+    <rect x="236" y="280" width="40" height="10" fill="#78350f" opacity="0.3" />
+    <rect x="236" y="300" width="40" height="10" fill="#78350f" opacity="0.3" />
+    <rect x="236" y="320" width="40" height="10" fill="#78350f" opacity="0.3" />
+  </g>
+
+</svg>

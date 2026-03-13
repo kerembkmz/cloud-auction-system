@@ -1,111 +1,233 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
+import * as React from "react"
+import { onValue, ref } from "firebase/database"
+
+import { buttonVariants } from "@/components/ui/button"
 import {
   Card,
-  CardAction,
+  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { TrendUpIcon, TrendDownIcon } from "@phosphor-icons/react"
+import { cn } from "@/lib/utils"
+import { database, isFirebaseConfigured } from "@/lib/firebase"
+import { finalizeExpiredAuctions } from "@/services/auction"
+
+interface Auction {
+  id: string
+  itemName: string
+  imageUrl: string
+  sellerId: string
+  sellerName: string
+  currentHighestBid: number
+  endsAt: number
+  status: "active" | "inactive" | "ended" | "cancelled"
+}
+
+const FALLBACK_AUCTIONS: Auction[] = [
+  {
+    id: "fallback-1",
+    itemName: "Vintage Camera",
+    imageUrl:
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
+    sellerId: "seller-camera",
+    sellerName: "Camera Seller",
+    currentHighestBid: 420,
+    endsAt: Date.now() + 1000 * 60 * 56,
+    status: "active",
+  },
+  {
+    id: "fallback-2",
+    itemName: "Mechanical Keyboard",
+    imageUrl:
+      "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?auto=format&fit=crop&w=1200&q=80",
+    sellerId: "seller-keyboard",
+    sellerName: "Keyboard Seller",
+    currentHighestBid: 165,
+    endsAt: Date.now() + 1000 * 60 * 120,
+    status: "active",
+  },
+  {
+    id: "fallback-3",
+    itemName: "Retro Record Player",
+    imageUrl:
+      "https://images.unsplash.com/photo-1461360228754-6e81c478b882?auto=format&fit=crop&w=1200&q=80",
+    sellerId: "seller-records",
+    sellerName: "Record Seller",
+    currentHighestBid: 880,
+    endsAt: Date.now() + 1000 * 60 * 33,
+    status: "active",
+  },
+]
+
+function toAuction(id: string, value: unknown): Auction | null {
+  if (!value || typeof value !== "object") {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const itemName = typeof record.itemName === "string" ? record.itemName : null
+  const imageUrl = typeof record.imageUrl === "string" ? record.imageUrl : ""
+  const sellerId = typeof record.sellerId === "string" ? record.sellerId : "unknown-seller"
+  const sellerName = typeof record.sellerName === "string" ? record.sellerName : sellerId
+  const status =
+    record.status === "active" ||
+    record.status === "inactive" ||
+    record.status === "ended" ||
+    record.status === "cancelled"
+      ? record.status
+      : "active"
+  const endsAt =
+    typeof record.endsAt === "number"
+      ? record.endsAt
+      : typeof record.endsAt === "string"
+        ? Number(record.endsAt)
+        : NaN
+  const currentHighestBid =
+    typeof record.currentHighestBid === "number"
+      ? record.currentHighestBid
+      : typeof record.currentPrice === "number"
+        ? record.currentPrice
+        : typeof record.startingPrice === "number"
+          ? record.startingPrice
+          : 0
+
+  if (!itemName || Number.isNaN(endsAt)) {
+    return null
+  }
+
+  return {
+    id,
+    itemName,
+    imageUrl,
+    sellerId,
+    sellerName,
+    currentHighestBid,
+    endsAt,
+    status,
+  }
+}
+
+function formatRemainingTime(endsAt: number, now: number): string {
+  const totalSeconds = Math.max(0, Math.floor((endsAt - now) / 1000))
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  return `${hours.toString().padStart(2, "0")}:${minutes
+    .toString()
+    .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`
+}
 
 export function SectionCards() {
+  const [auctions, setAuctions] = React.useState<Auction[]>([])
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [now, setNow] = React.useState(0)
+
+  React.useEffect(() => {
+    setNow(Date.now())
+
+    const timer = window.setInterval(() => {
+      setNow(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [])
+
+  React.useEffect(() => {
+    if (!isFirebaseConfigured || !database) {
+      setAuctions(FALLBACK_AUCTIONS)
+      setIsLoading(false)
+      return
+    }
+
+    void finalizeExpiredAuctions()
+
+    const auctionsRef = ref(database, "auctions")
+    const unsubscribe = onValue(auctionsRef, (snapshot) => {
+      const value = snapshot.val() as Record<string, unknown> | null
+
+      if (!value) {
+        setAuctions([])
+        setIsLoading(false)
+        return
+      }
+
+      const mapped = Object.entries(value)
+        .map(([id, auctionValue]) => toAuction(id, auctionValue))
+        .filter((auction): auction is Auction => auction !== null)
+        .filter((auction) => auction.status === "active" && auction.endsAt > Date.now())
+        .sort((a, b) => a.endsAt - b.endsAt)
+
+      setAuctions(mapped)
+      setIsLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="px-4 text-xs text-muted-foreground lg:px-6">
+        Loading active auctions...
+      </div>
+    )
+  }
+
+  if (auctions.length === 0) {
+    return (
+      <div className="px-4 lg:px-6">
+        <Card className="border-slate-300 bg-slate-50">
+          <CardHeader>
+            <CardTitle>No active auctions</CardTitle>
+            <CardDescription>
+              Active auctions will appear here once they are added to Firebase
+              Realtime Database under the `auctions` node.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Total Revenue</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            $1,250.00
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendUpIcon
-              />
-              +12.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Trending up this month{" "}
-            <TrendUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Visitors for the last 6 months
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>New Customers</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            1,234
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendDownIcon
-              />
-              -20%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Down 20% this period{" "}
-            <TrendDownIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">
-            Acquisition needs attention
-          </div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Active Accounts</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            45,678
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendUpIcon
-              />
-              +12.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Strong user retention{" "}
-            <TrendUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Engagement exceed targets</div>
-        </CardFooter>
-      </Card>
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription>Growth Rate</CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            4.5%
-          </CardTitle>
-          <CardAction>
-            <Badge variant="outline">
-              <TrendUpIcon
-              />
-              +4.5%
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardFooter className="flex-col items-start gap-1.5 text-sm">
-          <div className="line-clamp-1 flex gap-2 font-medium">
-            Steady performance increase{" "}
-            <TrendUpIcon className="size-4" />
-          </div>
-          <div className="text-muted-foreground">Meets growth projections</div>
-        </CardFooter>
-      </Card>
+    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
+      {auctions.map((auction) => (
+        <Card key={auction.id} className="border-slate-300 bg-white pt-0">
+          <img
+            src={auction.imageUrl || "https://placehold.co/960x640/e2e8f0/1e293b?text=Auction+Item"}
+            alt={auction.itemName}
+            className="h-44 w-full border-b border-slate-200 object-cover"
+          />
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold text-slate-900">
+              {auction.itemName}
+            </CardTitle>
+            <CardDescription className="text-slate-600">
+              Remaining time: {formatRemainingTime(auction.endsAt, now)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-slate-600">Seller: {auction.sellerName}</p>
+            <p className="text-xs text-slate-600">Current highest bid</p>
+            <p className="text-lg font-semibold text-slate-900">
+              ${auction.currentHighestBid.toLocaleString()}
+            </p>
+          </CardContent>
+          <CardFooter className="justify-end border-slate-200">
+            <Link
+              href={`/auction/${auction.id}`}
+              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+            >
+              Join auction
+            </Link>
+          </CardFooter>
+        </Card>
+      ))}
     </div>
   )
 }

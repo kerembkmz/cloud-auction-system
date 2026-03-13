@@ -1,4 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
+import { getDatabase, type Database } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
@@ -20,12 +21,9 @@ const isFirebaseConfigured = requiredFirebaseKeys.every(
   (key) => key.trim().length > 0,
 );
 
-if (isFirebaseConfigured) {
-  if (getApps().length === 0) {
-    initializeApp(firebaseConfig);
-  } else {
-    getApp();
-  }
-}
+const firebaseApp =
+  getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-export { isFirebaseConfigured };
+const database: Database = getDatabase(firebaseApp);
+
+export { database, isFirebaseConfigured };

@@ -15,7 +15,16 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { SquaresFourIcon, ListIcon, ChartBarIcon, FolderIcon, UsersIcon, CameraIcon, FileTextIcon, GearIcon, QuestionIcon, MagnifyingGlassIcon, DatabaseIcon, ChartLineIcon, FileIcon, CommandIcon } from "@phosphor-icons/react"
+import {
+  ClockCounterClockwiseIcon,
+  CommandIcon,
+  GearIcon,
+  HouseIcon,
+  LockSimpleIcon,
+  MagnifyingGlassIcon,
+  PlusCircleIcon,
+  QuestionIcon,
+} from "@phosphor-icons/react"
 
 const data = {
   user: {
@@ -25,101 +34,36 @@ const data = {
   },
   navMain: [
     {
-      title: "Dashboard",
-      url: "#",
+      title: "Overview",
+      url: "/overview",
       icon: (
-        <SquaresFourIcon
+        <HouseIcon
         />
       ),
     },
     {
-      title: "Lifecycle",
-      url: "#",
+      title: "Create Auction",
+      url: "/create-auction",
       icon: (
-        <ListIcon
+        <PlusCircleIcon
         />
       ),
     },
     {
-      title: "Analytics",
-      url: "#",
+      title: "History",
+      url: "/history",
       icon: (
-        <ChartBarIcon
+        <ClockCounterClockwiseIcon
         />
       ),
     },
     {
-      title: "Projects",
-      url: "#",
+      title: "Admin",
+      url: "/admin",
       icon: (
-        <FolderIcon
+        <LockSimpleIcon
         />
       ),
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: (
-        <UsersIcon
-        />
-      ),
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: (
-        <CameraIcon
-        />
-      ),
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: (
-        <FileTextIcon
-        />
-      ),
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
     },
   ],
   navSecondary: [
@@ -150,26 +94,18 @@ const data = {
   ],
   documents: [
     {
-      name: "Data Library",
-      url: "#",
+      name: "All Auctions",
+      url: "/overview",
       icon: (
-        <DatabaseIcon
+        <HouseIcon
         />
       ),
     },
     {
-      name: "Reports",
-      url: "#",
+      name: "Create Auction",
+      url: "/create-auction",
       icon: (
-        <ChartLineIcon
-        />
-      ),
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: (
-        <FileIcon
+        <PlusCircleIcon
         />
       ),
     },

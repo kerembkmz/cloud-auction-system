@@ -1,6 +1,7 @@
 import { get, push, ref, runTransaction, set } from "firebase/database";
+import { doc, runTransaction as runFirestoreTransaction, updateDoc, increment, writeBatch } from "firebase/firestore";
 
-import { database, isFirebaseConfigured } from "@/lib/firebase";
+import { database, db, isFirebaseConfigured } from "@/lib/firebase";
 import type { AuctionRecord, AuctionSettings } from "@/types/auction";
 import type { AppUser } from "@/types/user";
 
@@ -187,9 +188,9 @@ export async function createAuction(input: CreateAuctionInput): Promise<string> 
   const settings = await fetchAuctionSettings();
   const durationMinutes = settings.allowCustomDuration
     ? Math.min(
-        settings.maxDurationMinutes,
-        Math.max(settings.minDurationMinutes, Math.floor(input.requestedDurationMinutes))
-      )
+      settings.maxDurationMinutes,
+      Math.max(settings.minDurationMinutes, Math.floor(input.requestedDurationMinutes))
+    )
     : settings.fixedDurationMinutes;
 
   const startTime = Date.now();
@@ -248,51 +249,97 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
     throw new Error("Bid amount must be a positive number.");
   }
 
-  const auctionRef = ref(database, `auctions/${auctionId}`);
-  let rejectionReason = "Unable to place bid.";
-
-  const result = await runTransaction(auctionRef, (currentValue) => {
-    if (!currentValue || typeof currentValue !== "object") {
-      rejectionReason = "Auction not found.";
-      return;
+  const userRef = doc(db, "users", bidderId);
+  await runFirestoreTransaction(db, async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists()) {
+      throw new Error("User profile not found.");
     }
-
-    const record = currentValue as Record<string, unknown>;
-    const status = record.status;
-    const sellerId = typeof record.sellerId === "string" ? record.sellerId : "";
-    const endsAt = typeof record.endsAt === "number" ? record.endsAt : 0;
-    const currentHighestBid =
-      typeof record.currentHighestBid === "number"
-        ? record.currentHighestBid
-        : typeof record.basePrice === "number"
-          ? record.basePrice
-          : 0;
-
-    if (status !== "active" || endsAt <= Date.now()) {
-      rejectionReason = "This auction is no longer active.";
-      return;
+    const userData = userDoc.data();
+    const balance = userData.balance || 0;
+    if (balance < amount) {
+      throw new Error(`Insufficient balance. You have $${balance.toLocaleString()}, but need $${amount.toLocaleString()}.`);
     }
-
-    if (sellerId === bidderId) {
-      rejectionReason = "You cannot bid on your own item.";
-      return;
-    }
-
-    if (amount <= currentHighestBid) {
-      rejectionReason = "Bid must be higher than current highest bid.";
-      return;
-    }
-
-    return {
-      ...record,
-      currentHighestBid: amount,
-      currentHighestBidOwnerId: bidderId,
-      currentHighestBidOwnerName: bidderName,
-    };
+    transaction.update(userRef, {
+      balance: increment(-amount),
+      freezed_balance: increment(amount)
+    });
   });
 
-  if (!result.committed) {
-    throw new Error(rejectionReason);
+  const auctionRef = ref(database, `auctions/${auctionId}`);
+  let rejectionReason = "Unable to place bid.";
+  let previousBidderId: string | null = null;
+  let previousBidAmount: number = 0;
+
+  try {
+    const result = await runTransaction(auctionRef, (currentValue) => {
+      if (!currentValue || typeof currentValue !== "object") {
+        rejectionReason = "Auction not found.";
+        return;
+      }
+
+      const record = currentValue as Record<string, unknown>;
+      const status = record.status;
+      const sellerId = typeof record.sellerId === "string" ? record.sellerId : "";
+      const endsAt = typeof record.endsAt === "number" ? record.endsAt : 0;
+      const currentHighestBid =
+        typeof record.currentHighestBid === "number"
+          ? record.currentHighestBid
+          : typeof record.basePrice === "number"
+            ? record.basePrice
+            : 0;
+
+      if (status !== "active" || endsAt <= Date.now()) {
+        rejectionReason = "This auction is no longer active.";
+        return;
+      }
+
+      if (sellerId === bidderId) {
+        rejectionReason = "You cannot bid on your own item.";
+        return;
+      }
+
+      if (amount <= currentHighestBid) {
+        rejectionReason = "Bid must be higher than current highest bid.";
+        return;
+      }
+
+      previousBidderId = record.currentHighestBidOwnerId as string | null;
+      previousBidAmount = currentHighestBid;
+
+      return {
+        ...record,
+        currentHighestBid: amount,
+        currentHighestBidOwnerId: bidderId,
+        currentHighestBidOwnerName: bidderName,
+      };
+    });
+
+    if (!result.committed) {
+      await updateDoc(userRef, {
+        balance: increment(amount),
+        freezed_balance: increment(-amount)
+      });
+      throw new Error(rejectionReason);
+    }
+  } catch (error) {
+    await updateDoc(userRef, {
+      balance: increment(amount),
+      freezed_balance: increment(-amount)
+    });
+    throw error;
+  }
+
+  if (previousBidderId && previousBidAmount > 0) {
+    try {
+      const prevUserRef = doc(db, "users", previousBidderId);
+      await updateDoc(prevUserRef, {
+        balance: increment(previousBidAmount),
+        freezed_balance: increment(-previousBidAmount)
+      });
+    } catch (e) {
+      console.error(`Failed to refund previous bidder ${previousBidderId}:`, e);
+    }
   }
 
   await push(ref(database, `auctions/${auctionId}/bids`), {
@@ -331,7 +378,11 @@ export async function finalizeExpiredAuctions(): Promise<void> {
   await Promise.all(
     updates.map(async ({ auctionId }) => {
       const auctionRef = ref(database, `auctions/${auctionId}`);
-      await runTransaction(auctionRef, (currentValue) => {
+      let winnerId: string | null = null;
+      let winningAmount: number = 0;
+      let sellerId: string | null = null;
+
+      const result = await runTransaction(auctionRef, (currentValue) => {
         if (!currentValue || typeof currentValue !== "object") {
           return;
         }
@@ -344,11 +395,38 @@ export async function finalizeExpiredAuctions(): Promise<void> {
           return;
         }
 
+        winnerId = record.currentHighestBidOwnerId as string | null;
+        winningAmount = typeof record.currentHighestBid === "number" ? record.currentHighestBid : 0;
+        sellerId = typeof record.sellerId === "string" ? record.sellerId : null;
+
         return {
           ...record,
           status: "inactive",
         };
       });
+
+      if (result.committed) {
+        if (winnerId && winningAmount > 0) {
+          try {
+            const batch = writeBatch(db);
+            const winnerRef = doc(db, "users", winnerId);
+            batch.update(winnerRef, {
+              freezed_balance: increment(-winningAmount)
+            });
+
+            if (sellerId) {
+              const sellerRef = doc(db, "users", sellerId);
+              batch.update(sellerRef, {
+                balance: increment(winningAmount)
+              });
+            }
+
+            await batch.commit();
+          } catch (e) {
+            console.error("Failed to process transaction for winning / selling users:", e);
+          }
+        }
+      }
     })
   );
 }

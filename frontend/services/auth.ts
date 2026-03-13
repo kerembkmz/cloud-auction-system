@@ -130,6 +130,7 @@ export async function registerWithEmailPassword(
         email: user.email,
         username: normalizedUsername,
         createdAt: serverTimestamp(),
+        balance: 0,
       });
 
       await sendEmailVerification(user);

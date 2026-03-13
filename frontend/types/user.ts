@@ -2,5 +2,6 @@ export interface AppUser {
   id: string;
   name: string;
   email: string;
-  avatar?: string;
+  balance?: number;
+  freezed_balance?: number;
 }

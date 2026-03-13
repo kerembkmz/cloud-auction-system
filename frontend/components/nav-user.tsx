@@ -24,6 +24,7 @@ import { DotsThreeVerticalIcon, UserCircleIcon, CreditCardIcon, BellIcon, SignOu
 import { useCurrentUser } from "@/hooks/use-current-user"
 import { logout } from "@/services/auth"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 export function NavUser() {
   const { user, isLoading } = useCurrentUser()
@@ -97,11 +98,12 @@ export function NavUser() {
                 />
                 Account
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCardIcon
-                />
-                Billing
-              </DropdownMenuItem>
+              <Link href="/payment" className="block">
+                <DropdownMenuItem>
+                  <CreditCardIcon />
+                  Add Balance
+                </DropdownMenuItem>
+              </Link>
               <DropdownMenuItem>
                 <BellIcon
                 />

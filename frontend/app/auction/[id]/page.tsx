@@ -98,6 +98,16 @@ export default function AuctionDetailsPage() {
     return () => unsubscribe();
   }, [auctionId]);
 
+  const hasExpired = Boolean(
+    auction && auction.status === "active" && now > 0 && now >= auction.endsAt
+  );
+
+  React.useEffect(() => {
+    if (hasExpired) {
+      void finalizeExpiredAuctions();
+    }
+  }, [hasExpired]);
+
   if (!auctionId) {
     notFound();
   }

@@ -69,13 +69,13 @@ export default function AuctionDetailsPage() {
 
   const [now, setNow] = React.useState(0);
   const [auction, setAuction] = React.useState<Auction | null>(null);
-  const [prevAuctionStatus, setPrevAuctionStatus] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [bidAmount, setBidAmount] = React.useState("");
   const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
   const [bidFeedback, setBidFeedback] = React.useState("");
   const [showNotification, setShowNotification] = React.useState(false);
   const [userRole, setUserRole] = React.useState<"winner" | "seller" | "bidder">("bidder");
+  const prevAuctionStatusRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     setNow(Date.now());
@@ -98,7 +98,7 @@ export default function AuctionDetailsPage() {
       setAuction(mapped);
 
       // Check if auction just ended
-      if (mapped && prevAuctionStatus === "active" && mapped.status !== "active") {
+      if (mapped && prevAuctionStatusRef.current === "active" && mapped.status !== "active") {
         // Determine user role
         if (currentUser?.id === mapped.currentHighestBidOwnerId) {
           setUserRole("winner");
@@ -110,7 +110,7 @@ export default function AuctionDetailsPage() {
         setShowNotification(true);
       }
 
-      setPrevAuctionStatus(mapped?.status ?? null);
+      prevAuctionStatusRef.current = mapped?.status ?? null;
       setIsLoading(false);
     });
 

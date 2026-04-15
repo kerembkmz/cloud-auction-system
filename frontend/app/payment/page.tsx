@@ -184,7 +184,7 @@ function PaymentForm() {
             <div className="w-px h-10 bg-slate-300"></div>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-slate-500">Freezed Balance (Bids)</span>
-              <span className="text-2xl font-bold text-slate-900">${(user.freezed_balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-2xl font-bold text-slate-900">${Object.values(user.freezed_balance ?? {}).reduce((sum, v) => sum + v, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
         )}

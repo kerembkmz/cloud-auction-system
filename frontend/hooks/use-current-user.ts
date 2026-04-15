@@ -47,7 +47,7 @@ export function useCurrentUser(): CurrentUserState {
         (snapshot) => {
           let resolvedName = firebaseUser.uid;
           let balance = 0;
-          let freezedBalance = 0;
+          let freezedBalance: Record<string, number> = {};
 
           if (snapshot.exists()) {
             const data = snapshot.data();
@@ -57,8 +57,12 @@ export function useCurrentUser(): CurrentUserState {
             if (typeof data.balance === "number") {
               balance = data.balance;
             }
-            if (typeof data.freezed_balance === "number") {
-              freezedBalance = data.freezed_balance;
+            if (data.freezed_balance && typeof data.freezed_balance === "object") {
+              freezedBalance = Object.fromEntries(
+                Object.entries(data.freezed_balance as Record<string, unknown>).filter(
+                  ([, v]) => typeof v === "number" && (v as number) > 0
+                ) as [string, number][]
+              );
             }
           }
 
@@ -77,7 +81,7 @@ export function useCurrentUser(): CurrentUserState {
             name: firebaseUser.uid,
             email: firebaseUser.email ?? "",
             balance: 0,
-            freezed_balance: 0,
+            freezed_balance: {},
           });
           setIsLoading(false);
         }

@@ -3,5 +3,5 @@ export interface AppUser {
   name: string;
   email: string;
   balance?: number;
-  freezed_balance?: number;
+  freezed_balance?: Record<string, number>;
 }

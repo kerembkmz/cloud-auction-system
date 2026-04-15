@@ -140,7 +140,7 @@ export async function registerWithEmailPassword(
         username: normalizedUsername,
         createdAt: serverTimestamp(),
         balance: 0,
-        freezed_balance: 0,
+        freezed_balance: {},
       });
 
       await sendEmailVerification(user);

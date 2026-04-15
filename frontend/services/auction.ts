@@ -1,5 +1,5 @@
 import { get, push, ref, runTransaction, set } from "firebase/database";
-import { doc, runTransaction as runFirestoreTransaction, updateDoc, increment, writeBatch } from "firebase/firestore";
+import { doc, runTransaction as runFirestoreTransaction, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
 
 import { database, db, isFirebaseConfigured } from "@/lib/firebase";
 import type { AuctionRecord, AuctionSettings } from "@/types/auction";
@@ -262,7 +262,7 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
     }
     transaction.update(userRef, {
       balance: increment(-amount),
-      freezed_balance: increment(amount)
+      [`freezed_balance.${auctionId}`]: amount,
     });
   });
 
@@ -318,14 +318,14 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
     if (!result.committed) {
       await updateDoc(userRef, {
         balance: increment(amount),
-        freezed_balance: increment(-amount)
+        [`freezed_balance.${auctionId}`]: deleteField(),
       });
       throw new Error(rejectionReason);
     }
   } catch (error) {
     await updateDoc(userRef, {
       balance: increment(amount),
-      freezed_balance: increment(-amount)
+      [`freezed_balance.${auctionId}`]: deleteField(),
     });
     throw error;
   }
@@ -335,7 +335,7 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
       const prevUserRef = doc(db, "users", previousBidderId);
       await updateDoc(prevUserRef, {
         balance: increment(previousBidAmount),
-        freezed_balance: increment(-previousBidAmount)
+        [`freezed_balance.${auctionId}`]: deleteField(),
       });
     } catch (e) {
       console.error(`Failed to refund previous bidder ${previousBidderId}:`, e);
@@ -411,7 +411,7 @@ export async function finalizeExpiredAuctions(): Promise<void> {
             const batch = writeBatch(db);
             const winnerRef = doc(db, "users", winnerId);
             batch.update(winnerRef, {
-              freezed_balance: increment(-winningAmount)
+              [`freezed_balance.${auctionId}`]: deleteField(),
             });
 
             if (sellerId) {

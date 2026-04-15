@@ -119,11 +119,11 @@ export function AuctionEndNotification({
   const getTitle = () => {
     switch (userRole) {
       case "winner":
-        return "Congratulations! 🎉"
+        return "Congratulations"
       case "seller":
-        return "Auction Ended"
+        return "Bidding Concluded"
       case "bidder":
-        return "Auction Ended"
+        return "Auction Result"
       default:
         return "Auction Ended"
     }
@@ -132,11 +132,11 @@ export function AuctionEndNotification({
   const getDescription = () => {
     switch (userRole) {
       case "winner":
-        return `You won the bidding for "${itemName}" with a final bid of $${winningAmount.toLocaleString()}!`
+        return `Congrats, you won this auction for $${winningAmount.toLocaleString()}.`
       case "seller":
-        return `Bidding has concluded for "${itemName}". The final price is $${winningAmount.toLocaleString()}.`
+        return `The bidding is concluded. You won $${winningAmount.toLocaleString()} for "${itemName}".`
       case "bidder":
-        return `${winnerName} won the bidding for "${itemName}" with a bid of $${winningAmount.toLocaleString()}.`
+        return `Another user won this auction for $${winningAmount.toLocaleString()}.`
       default:
         return ""
     }
@@ -148,8 +148,14 @@ export function AuctionEndNotification({
     router.push("/overview")
   }
 
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      handleClose()
+    }
+  }
+
   return (
-    <AlertDialog open={isOpen} onOpenChange={handleClose}>
+    <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
       <AlertDialogContent className="border-slate-300 bg-white">
         <AlertDialogTitle className="text-2xl font-bold text-slate-900">
           {getTitle()}

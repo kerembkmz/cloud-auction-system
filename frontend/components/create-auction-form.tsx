@@ -132,26 +132,24 @@ export function CreateAuctionForm() {
           </label>
 
           <label className="text-xs text-slate-900 md:col-span-2">
-            Description
+            Description (optional)
             <textarea
-              required
               value={form.description}
               onChange={(event) =>
                 setForm((previous) => ({ ...previous, description: event.target.value }))
               }
               className="mt-2 min-h-24 w-full border border-slate-300 px-2 py-1 text-xs"
-              placeholder="Short description of the item"
+              placeholder="Leave empty to use a default description"
             />
           </label>
 
           <label className="text-xs text-slate-900 md:col-span-2">
-            Photo link
+            Photo link (optional)
             <input
-              required
               value={form.imageUrl}
               onChange={(event) => setForm((previous) => ({ ...previous, imageUrl: event.target.value }))}
               className="mt-2 w-full border border-slate-300 px-2 py-1 text-xs"
-              placeholder="https://..."
+              placeholder="Leave empty to use a default question-mark image"
             />
           </label>
 

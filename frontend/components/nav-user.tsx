@@ -25,6 +25,7 @@ import { useCurrentUser } from "@/hooks/use-current-user"
 import { logout } from "@/services/auth"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { getUserInitials, getAvatarBackgroundColor, cn } from "@/lib/utils"
 
 export function NavUser() {
   const { user, isLoading } = useCurrentUser()
@@ -36,7 +37,7 @@ export function NavUser() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" disabled>
-            <Avatar className="size-8 rounded-lg grayscale">
+            <Avatar className="size-8 rounded-lg bg-slate-500 text-white">
               <AvatarFallback className="rounded-lg">...</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
@@ -48,6 +49,9 @@ export function NavUser() {
     )
   }
 
+  const initials = getUserInitials(user.name)
+  const bgColor = getAvatarBackgroundColor(user.name)
+
   return (
     <SidebarMenu>
       <SidebarMenuItem>
@@ -57,9 +61,8 @@ export function NavUser() {
               <SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />
             }
           >
-            <Avatar className="size-8 rounded-lg grayscale">
-              <AvatarImage src={user.avatar} alt={user.name} />
-              <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+            <Avatar className="size-8 rounded-lg overflow-hidden">
+              <AvatarFallback className={cn("rounded-lg text-white font-bold text-xs flex items-center justify-center", bgColor)}>{initials}</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-medium">{user.name}</span>
@@ -78,9 +81,8 @@ export function NavUser() {
             <DropdownMenuGroup>
               <DropdownMenuLabel className="p-0 font-normal">
                 <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                  <Avatar className="size-8">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                  <Avatar className="size-8 rounded-lg overflow-hidden">
+                    <AvatarFallback className={cn("rounded-lg text-white font-bold text-xs flex items-center justify-center", bgColor)}>{initials}</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-medium">{user.name}</span>

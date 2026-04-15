@@ -12,6 +12,8 @@ const DEFAULT_SETTINGS: AuctionSettings = {
   fixedDurationMinutes: 5,
   minDurationMinutes: 5,
   maxDurationMinutes: 30,
+  autoRestartOnNoBid: true,
+  changeStartingPriceOnRestart: false,
 };
 
 export function AuctionSettingsPanel() {
@@ -63,7 +65,7 @@ export function AuctionSettingsPanel() {
   };
 
   return (
-    <div className="px-4 lg:px-6">
+    <div className="px-4 lg:px-6 space-y-4">
       <Card className="border-slate-300 bg-white">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-slate-900">Auction Duration Settings</CardTitle>
@@ -130,6 +132,58 @@ export function AuctionSettingsPanel() {
                   }
                   className="mt-2 w-full border border-slate-300 px-2 py-1 text-xs"
                 />
+              </label>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center gap-3">
+            <Button onClick={handleSave} disabled={isLoading || isSaving}>
+              {isSaving ? "Saving..." : "Save Settings"}
+            </Button>
+            {message ? <p className="text-xs text-slate-600">{message}</p> : null}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-300 bg-white">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-900">Auction Restart Settings</CardTitle>
+          <CardDescription className="text-slate-600">
+            Configure how auctions behave when they end with no bidders.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <p className="text-xs text-slate-600">Loading settings...</p>
+          ) : (
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 border border-slate-300 p-3 text-xs text-slate-900">
+                <input
+                  type="checkbox"
+                  checked={settings.autoRestartOnNoBid ?? true}
+                  onChange={(event) =>
+                    setSettings((previous) => ({
+                      ...previous,
+                      autoRestartOnNoBid: event.target.checked,
+                    }))
+                  }
+                />
+                Automatically restart auctions with no bids
+              </label>
+
+              <label className="flex items-center gap-2 border border-slate-300 p-3 text-xs text-slate-900">
+                <input
+                  type="checkbox"
+                  disabled={!settings.autoRestartOnNoBid}
+                  checked={settings.changeStartingPriceOnRestart ?? false}
+                  onChange={(event) =>
+                    setSettings((previous) => ({
+                      ...previous,
+                      changeStartingPriceOnRestart: event.target.checked,
+                    }))
+                  }
+                />
+                Change starting price when restarting auctions
               </label>
             </div>
           )}

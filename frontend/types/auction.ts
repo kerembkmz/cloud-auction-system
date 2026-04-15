@@ -5,6 +5,8 @@ export interface AuctionSettings {
   fixedDurationMinutes: number;
   minDurationMinutes: number;
   maxDurationMinutes: number;
+  autoRestartOnNoBid?: boolean;
+  changeStartingPriceOnRestart?: boolean;
 }
 
 export interface AuctionRecord {

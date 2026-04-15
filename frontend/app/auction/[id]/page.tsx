@@ -8,6 +8,7 @@ import { onValue, ref } from "firebase/database";
 import { Button } from "@/components/ui/button";
 import { AuthGuard } from "@/components/auth-guard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AuctionEndNotification } from "@/components/auction-end-notification";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { database, isFirebaseConfigured } from "@/lib/firebase";
 import { finalizeExpiredAuctions, placeBid } from "@/services/auction";
@@ -68,10 +69,13 @@ export default function AuctionDetailsPage() {
 
   const [now, setNow] = React.useState(0);
   const [auction, setAuction] = React.useState<Auction | null>(null);
+  const [prevAuctionStatus, setPrevAuctionStatus] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [bidAmount, setBidAmount] = React.useState("");
   const [isSubmittingBid, setIsSubmittingBid] = React.useState(false);
   const [bidFeedback, setBidFeedback] = React.useState("");
+  const [showNotification, setShowNotification] = React.useState(false);
+  const [userRole, setUserRole] = React.useState<"winner" | "seller" | "bidder">("bidder");
 
   React.useEffect(() => {
     setNow(Date.now());
@@ -92,11 +96,26 @@ export default function AuctionDetailsPage() {
       const value = snapshot.val();
       const mapped = toAuction(auctionId, value);
       setAuction(mapped);
+
+      // Check if auction just ended
+      if (mapped && prevAuctionStatus === "active" && mapped.status !== "active") {
+        // Determine user role
+        if (currentUser?.id === mapped.currentHighestBidOwnerId) {
+          setUserRole("winner");
+        } else if (currentUser?.id === mapped.sellerId) {
+          setUserRole("seller");
+        } else {
+          setUserRole("bidder");
+        }
+        setShowNotification(true);
+      }
+
+      setPrevAuctionStatus(mapped?.status ?? null);
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [auctionId]);
+  }, [auctionId, currentUser?.id]);
 
   const hasExpired = Boolean(
     auction && auction.status === "active" && now > 0 && now >= auction.endsAt
@@ -148,6 +167,18 @@ export default function AuctionDetailsPage() {
 
   return (
     <AuthGuard>
+      {auction && (
+        <AuctionEndNotification
+          isOpen={showNotification}
+          itemName={auction.itemName}
+          winnerName={auction.currentHighestBidOwnerName || "No winner"}
+          winningAmount={auction.currentHighestBid || auction.basePrice}
+          userRole={userRole}
+          sellerId={auction.sellerId}
+          currentUserId={currentUser?.id}
+          onClose={() => setShowNotification(false)}
+        />
+      )}
       <main className="min-h-svh bg-slate-100 p-6 text-slate-900">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
         <div className="flex items-center justify-between">

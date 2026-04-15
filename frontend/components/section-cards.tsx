@@ -16,6 +16,8 @@ import {
 import { cn } from "@/lib/utils"
 import { database, isFirebaseConfigured } from "@/lib/firebase"
 import { finalizeExpiredAuctions } from "@/services/auction"
+import { useCurrentUser } from "@/hooks/use-current-user"
+import { useRouter } from "next/navigation"
 
 interface Auction {
   id: string
@@ -127,6 +129,8 @@ export function SectionCards() {
   const [auctions, setAuctions] = React.useState<Auction[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [now, setNow] = React.useState(0)
+  const { isAuthenticated } = useCurrentUser()
+  const router = useRouter()
 
   React.useEffect(() => {
     setNow(Date.now())
@@ -219,12 +223,21 @@ export function SectionCards() {
             </p>
           </CardContent>
           <CardFooter className="justify-end border-slate-200">
-            <Link
-              href={`/auction/${auction.id}`}
-              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
-            >
-              Join auction
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href={`/auction/${auction.id}`}
+                className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+              >
+                Join auction
+              </Link>
+            ) : (
+              <button
+                onClick={() => router.push("/")}
+                className={cn(buttonVariants({ variant: "default", size: "sm" }))}
+              >
+                Sign in to bid
+              </button>
+            )}
           </CardFooter>
         </Card>
       ))}

@@ -2,9 +2,7 @@
 
 import * as React from "react"
 
-import { NavDocuments } from "@/components/nav-documents"
 import { NavMain } from "@/components/nav-main"
-import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
   Sidebar,
@@ -18,12 +16,8 @@ import {
 import {
   ClockCounterClockwiseIcon,
   CommandIcon,
-  GearIcon,
   HouseIcon,
-  LockSimpleIcon,
-  MagnifyingGlassIcon,
   PlusCircleIcon,
-  QuestionIcon,
 } from "@phosphor-icons/react"
 
 const data = {
@@ -34,7 +28,7 @@ const data = {
   },
   navMain: [
     {
-      title: "Overview",
+      title: "Auctions",
       url: "/overview",
       icon: (
         <HouseIcon
@@ -57,59 +51,9 @@ const data = {
         />
       ),
     },
-    {
-      title: "Admin",
-      url: "/admin",
-      icon: (
-        <LockSimpleIcon
-        />
-      ),
-    },
   ],
-  navSecondary: [
-    {
-      title: "Settings",
-      url: "#",
-      icon: (
-        <GearIcon
-        />
-      ),
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: (
-        <QuestionIcon
-        />
-      ),
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: (
-        <MagnifyingGlassIcon
-        />
-      ),
-    },
-  ],
-  documents: [
-    {
-      name: "All Auctions",
-      url: "/overview",
-      icon: (
-        <HouseIcon
-        />
-      ),
-    },
-    {
-      name: "Create Auction",
-      url: "/create-auction",
-      icon: (
-        <PlusCircleIcon
-        />
-      ),
-    },
-  ],
+  navSecondary: [],
+  documents: []
 }
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -129,8 +73,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

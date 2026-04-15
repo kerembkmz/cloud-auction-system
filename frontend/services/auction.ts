@@ -10,7 +10,12 @@ const DEFAULT_SETTINGS: AuctionSettings = {
   fixedDurationMinutes: 5,
   minDurationMinutes: 5,
   maxDurationMinutes: 30,
+  autoRestartOnNoBid: true,
+  changeStartingPriceOnRestart: false,
 };
+
+const DEFAULT_AUCTION_DESCRIPTION = "No description provided by seller.";
+const DEFAULT_AUCTION_IMAGE_URL = "https://placehold.co/960x640/e2e8f0/1e293b?text=%3F";
 
 function ensureFirebaseReady(): void {
   if (!isFirebaseConfigured || !database) {
@@ -37,12 +42,16 @@ function normalizeSettings(value: unknown): AuctionSettings {
     typeof record.maxDurationMinutes === "number" && record.maxDurationMinutes >= minDurationMinutes
       ? record.maxDurationMinutes
       : Math.max(DEFAULT_SETTINGS.maxDurationMinutes, minDurationMinutes);
+  const autoRestartOnNoBid = Boolean(record.autoRestartOnNoBid ?? DEFAULT_SETTINGS.autoRestartOnNoBid);
+  const changeStartingPriceOnRestart = Boolean(record.changeStartingPriceOnRestart ?? DEFAULT_SETTINGS.changeStartingPriceOnRestart);
 
   return {
     allowCustomDuration,
     fixedDurationMinutes,
     minDurationMinutes,
     maxDurationMinutes,
+    autoRestartOnNoBid,
+    changeStartingPriceOnRestart,
   };
 }
 
@@ -169,11 +178,11 @@ export async function createAuction(input: CreateAuctionInput): Promise<string> 
   const userId = input.seller.id.trim();
   const sellerName = input.seller.name.trim();
   const itemName = input.itemName.trim();
-  const description = input.description.trim();
-  const imageUrl = input.imageUrl.trim();
+  const description = input.description.trim() || DEFAULT_AUCTION_DESCRIPTION;
+  const imageUrl = input.imageUrl.trim() || DEFAULT_AUCTION_IMAGE_URL;
 
-  if (!userId || !sellerName || !itemName || !description || !imageUrl) {
-    throw new Error("Signed-in user, item name, description, and photo link are required.");
+  if (!userId || !sellerName || !itemName) {
+    throw new Error("Signed-in user and item name are required.");
   }
 
   if (Number.isNaN(input.basePrice) || input.basePrice <= 0) {
@@ -364,6 +373,7 @@ export async function finalizeExpiredAuctions(): Promise<void> {
   const auctionsSnapshot = await get(ref(database, "auctions"));
   const auctions = (auctionsSnapshot.val() ?? {}) as Record<string, unknown>;
   const now = Date.now();
+  const settings = await fetchAuctionSettings();
 
   const updates = Object.entries(auctions)
     .filter(([, value]) => value && typeof value === "object")
@@ -381,6 +391,12 @@ export async function finalizeExpiredAuctions(): Promise<void> {
       let winnerId: string | null = null;
       let winningAmount: number = 0;
       let sellerId: string | null = null;
+      let hasNoBidders = false;
+      let itemName = "";
+      let sellerName = "";
+      let basePrice = 0;
+      let startTime = 0;
+      let durationMinutes = settings.fixedDurationMinutes;
 
       const result = await runTransaction(auctionRef, (currentValue) => {
         if (!currentValue || typeof currentValue !== "object") {
@@ -398,7 +414,30 @@ export async function finalizeExpiredAuctions(): Promise<void> {
         winnerId = record.currentHighestBidOwnerId as string | null;
         winningAmount = typeof record.currentHighestBid === "number" ? record.currentHighestBid : 0;
         sellerId = typeof record.sellerId === "string" ? record.sellerId : null;
+        itemName = typeof record.itemName === "string" ? record.itemName : "";
+        sellerName = typeof record.sellerName === "string" ? record.sellerName : "";
+        basePrice = typeof record.basePrice === "number" ? record.basePrice : 0;
+        startTime = typeof record.startTime === "number" ? record.startTime : 0;
+        
+        hasNoBidders = !winnerId || winningAmount === basePrice;
 
+        // If no bidders and auto-restart is enabled, restart the auction
+        if (hasNoBidders && settings.autoRestartOnNoBid) {
+          const newStartTime = Date.now();
+          const newEndsAt = newStartTime + durationMinutes * 60 * 1000;
+          
+          return {
+            ...record,
+            startTime: newStartTime,
+            endsAt: newEndsAt,
+            currentHighestBid: basePrice,
+            currentHighestBidOwnerId: null,
+            currentHighestBidOwnerName: null,
+            status: "active",
+          };
+        }
+
+        // Otherwise, mark as inactive
         return {
           ...record,
           status: "inactive",
@@ -406,7 +445,7 @@ export async function finalizeExpiredAuctions(): Promise<void> {
       });
 
       if (result.committed) {
-        if (winnerId && winningAmount > 0) {
+        if (!hasNoBidders && winnerId && winningAmount > 0) {
           try {
             const batch = writeBatch(db);
             const winnerRef = doc(db, "users", winnerId);
@@ -425,6 +464,16 @@ export async function finalizeExpiredAuctions(): Promise<void> {
           } catch (e) {
             console.error("Failed to process transaction for winning / selling users:", e);
           }
+        }
+
+        if (hasNoBidders && settings.autoRestartOnNoBid) {
+          await push(ref(database, "events/auctionRestarted"), {
+            auctionId,
+            itemName,
+            sellerId,
+            sellerName,
+            restartedAt: Date.now(),
+          });
         }
       }
     })

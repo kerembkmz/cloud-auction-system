@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { Resend } from "resend"
 
 interface AuctionNotificationRequest {
   auctionId?: string
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
 
   const auctionLabel = `${itemName} (${auctionId})`
   const amountText = formatAmount(winningAmount)
+  const resend = new Resend(apiKey)
 
   const emails = [
     {
@@ -84,27 +86,19 @@ export async function POST(request: Request) {
 
   const results = await Promise.all(
     emails.map(async (email) => {
-      const response = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromEmail,
-          to: email.to,
-          subject: email.subject,
-          html: email.html,
-          text: email.text,
-        }),
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: email.to,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(errorText || "Failed to send email.")
+      if (error) {
+        throw new Error(error.message || "Failed to send email.")
       }
 
-      return response.json() as Promise<{ id?: string }>
+      return data
     }),
   )
 

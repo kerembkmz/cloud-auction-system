@@ -7,10 +7,6 @@ import { AuctionSettingsPanel } from "@/components/auction-settings-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-const ADMIN_USERNAME = process.env.NEXT_PUBLIC_ADMIN_USERNAME ?? "admin";
-const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD ?? "admin123";
-const ADMIN_SESSION_KEY = "auction_admin_authenticated";
-
 export default function AdminPage() {
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -18,33 +14,58 @@ export default function AdminPage() {
   const [errorMessage, setErrorMessage] = React.useState("");
 
   React.useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
+    const loadAuthState = async () => {
+      const response = await fetch("/api/admin-auth", {
+        credentials: "include",
+      });
 
-    const authenticated = window.localStorage.getItem(ADMIN_SESSION_KEY) === "true";
-    setIsAuthenticated(authenticated);
+      if (!response.ok) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const data = (await response.json()) as { authenticated?: boolean };
+      setIsAuthenticated(Boolean(data.authenticated));
+    };
+
+    void loadAuthState();
   }, []);
 
-  const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+    try {
+      const response = await fetch("/api/admin-auth", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        const data = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(data.error ?? "Invalid username or password.");
+      }
+
       setIsAuthenticated(true);
       setErrorMessage("");
-      window.localStorage.setItem(ADMIN_SESSION_KEY, "true");
-      return;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Invalid username or password.");
     }
-
-    setErrorMessage("Invalid username or password.");
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch("/api/admin-auth", {
+      method: "DELETE",
+      credentials: "include",
+    });
+
     setIsAuthenticated(false);
     setUsername("");
     setPassword("");
     setErrorMessage("");
-    window.localStorage.removeItem(ADMIN_SESSION_KEY);
   };
 
   return (

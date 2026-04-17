@@ -11,6 +11,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { formatUsdAmount } from "@/lib/utils"
 
 interface AuctionEndNotificationProps {
   isOpen: boolean
@@ -132,11 +133,11 @@ export function AuctionEndNotification({
   const getDescription = () => {
     switch (userRole) {
       case "winner":
-        return `Congrats, you won this auction for $${winningAmount.toLocaleString()}.`
+        return `Congrats, you won this auction for ${formatUsdAmount(winningAmount)}.`
       case "seller":
-        return `The bidding is concluded. You won $${winningAmount.toLocaleString()} for "${itemName}".`
+        return `The auction for "${itemName}" ended. ${winnerName} won it for ${formatUsdAmount(winningAmount)}.`
       case "bidder":
-        return `Another user won this auction for $${winningAmount.toLocaleString()}.`
+        return `Another user won this auction for ${formatUsdAmount(winningAmount)}.`
       default:
         return ""
     }

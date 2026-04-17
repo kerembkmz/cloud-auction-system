@@ -106,14 +106,22 @@ export function NavUser() {
                   Add Balance
                 </DropdownMenuItem>
               </Link>
-              <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/overview#notifications")}>
                 <BellIcon
                 />
                 Notifications
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => logout()}>
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await logout()
+                  } finally {
+                    router.replace("/")
+                  }
+                }}
+              >
               <SignOutIcon
               />
               Log out

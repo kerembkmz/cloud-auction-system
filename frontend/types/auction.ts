@@ -17,8 +17,10 @@ export interface AuctionRecord {
   currentHighestBid: number;
   currentHighestBidOwnerId: string | null;
   currentHighestBidOwnerName: string | null;
+  currentHighestBidOwnerEmail: string | null;
   sellerId: string;
   sellerName: string;
+  sellerEmail: string;
   startTime: number;
   endsAt: number;
   status: AuctionStatus;

@@ -5,6 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+const usdAmountFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
+export function formatUsdAmount(amount: number): string {
+  return `$${usdAmountFormatter.format(amount)}`
+}
+
 export function getUserInitials(name: string): string {
   if (!name || typeof name !== "string") return "U"
   

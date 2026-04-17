@@ -13,6 +13,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { database, isFirebaseConfigured } from "@/lib/firebase";
 import { finalizeExpiredAuctions, placeBid } from "@/services/auction";
 import type { Auction } from "@/types/auction";
+import { formatUsdAmount } from "@/lib/utils";
 
 function formatRemainingTime(endsAt: number, now: number): string {
   const totalSeconds = Math.max(0, Math.floor((endsAt - now) / 1000));
@@ -214,11 +215,13 @@ export default function AuctionDetailsPage() {
           </Card>
         ) : (
           <Card className="border-slate-300 bg-white pt-0">
-            <img
-              src={auction.imageUrl || "https://placehold.co/960x640/e2e8f0/1e293b?text=Auction+Item"}
-              alt={auction.itemName}
-              className="h-72 w-full border-b border-slate-200 object-cover"
-            />
+            <div className="aspect-video w-full overflow-hidden border-b border-slate-200">
+              <img
+                src={auction.imageUrl || "https://placehold.co/960x640/e2e8f0/1e293b?text=Auction+Item"}
+                alt={auction.itemName}
+                className="h-full w-full object-cover"
+              />
+            </div>
             <CardHeader>
               <CardTitle>{auction.itemName}</CardTitle>
               <CardDescription>{auction.description}</CardDescription>
@@ -228,7 +231,13 @@ export default function AuctionDetailsPage() {
                 Seller: {auction.sellerName} ({auction.sellerId})
               </p>
               <p>Status: {auction.status}</p>
-              <p>Current highest bid: ${auction.currentHighestBid.toLocaleString()}</p>
+              <p>
+                {auction.currentHighestBidOwnerId ? "Current highest bid is" : "Starting price is"} {
+                  formatUsdAmount(
+                    auction.currentHighestBidOwnerId ? auction.currentHighestBid : auction.basePrice,
+                  )
+                }
+              </p>
               <p>
                 Highest bidder: {isAuctionCompleted
                   ? auction.currentHighestBidOwnerName ?? "No bids yet"

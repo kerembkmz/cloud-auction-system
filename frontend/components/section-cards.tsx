@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
+import { formatUsdAmount } from "@/lib/utils"
 import { database, isFirebaseConfigured } from "@/lib/firebase"
 import { finalizeExpiredAuctions } from "@/services/auction"
 import { useCurrentUser } from "@/hooks/use-current-user"
@@ -25,7 +26,9 @@ interface Auction {
   imageUrl: string
   sellerId: string
   sellerName: string
+  basePrice: number
   currentHighestBid: number
+  currentHighestBidOwnerId: string | null
   endsAt: number
   status: "active" | "inactive" | "ended" | "cancelled"
 }
@@ -38,7 +41,9 @@ const FALLBACK_AUCTIONS: Auction[] = [
       "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=80",
     sellerId: "seller-camera",
     sellerName: "Camera Seller",
+    basePrice: 420,
     currentHighestBid: 420,
+    currentHighestBidOwnerId: null,
     endsAt: 0,
     status: "active",
   },
@@ -49,7 +54,9 @@ const FALLBACK_AUCTIONS: Auction[] = [
       "https://images.unsplash.com/photo-1511467687858-23d96c32e4ae?auto=format&fit=crop&w=1200&q=80",
     sellerId: "seller-keyboard",
     sellerName: "Keyboard Seller",
+    basePrice: 165,
     currentHighestBid: 165,
+    currentHighestBidOwnerId: null,
     endsAt: 0,
     status: "active",
   },
@@ -60,7 +67,9 @@ const FALLBACK_AUCTIONS: Auction[] = [
       "https://images.unsplash.com/photo-1461360228754-6e81c478b882?auto=format&fit=crop&w=1200&q=80",
     sellerId: "seller-records",
     sellerName: "Record Seller",
+    basePrice: 880,
     currentHighestBid: 880,
+    currentHighestBidOwnerId: null,
     endsAt: 0,
     status: "active",
   },
@@ -114,6 +123,14 @@ function toAuction(id: string, value: unknown): Auction | null {
         : typeof record.startingPrice === "number"
           ? record.startingPrice
           : 0
+  const basePrice =
+    typeof record.basePrice === "number"
+      ? record.basePrice
+      : typeof record.startingPrice === "number"
+        ? record.startingPrice
+        : currentHighestBid
+  const currentHighestBidOwnerId =
+    typeof record.currentHighestBidOwnerId === "string" ? record.currentHighestBidOwnerId : null
 
   if (!itemName || Number.isNaN(endsAt)) {
     return null
@@ -125,7 +142,9 @@ function toAuction(id: string, value: unknown): Auction | null {
     imageUrl,
     sellerId,
     sellerName,
+    basePrice,
     currentHighestBid,
+    currentHighestBidOwnerId,
     endsAt,
     status,
   }
@@ -219,11 +238,13 @@ export function SectionCards() {
     <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-3">
       {auctions.map((auction) => (
         <Card key={auction.id} className="border-slate-300 bg-white pt-0">
-          <img
-            src={auction.imageUrl || "https://placehold.co/960x640/e2e8f0/1e293b?text=Auction+Item"}
-            alt={auction.itemName}
-            className="h-44 w-full border-b border-slate-200 object-cover"
-          />
+          <div className="aspect-[4/3] w-full overflow-hidden border-b border-slate-200">
+            <img
+              src={auction.imageUrl || "https://placehold.co/960x640/e2e8f0/1e293b?text=Auction+Item"}
+              alt={auction.itemName}
+              className="h-full w-full object-cover"
+            />
+          </div>
           <CardHeader>
             <CardTitle className="text-sm font-semibold text-slate-900">
               {auction.itemName}
@@ -234,9 +255,13 @@ export function SectionCards() {
           </CardHeader>
           <CardContent>
             <p className="text-xs text-slate-600">Seller: {auction.sellerName}</p>
-            <p className="text-xs text-slate-600">Current highest bid</p>
+            <p className="text-xs text-slate-600">
+              {auction.currentHighestBidOwnerId ? "Current highest bid is" : "Starting price is"}
+            </p>
             <p className="text-lg font-semibold text-slate-900">
-              ${auction.currentHighestBid.toLocaleString()}
+              {formatUsdAmount(
+                auction.currentHighestBidOwnerId ? auction.currentHighestBid : auction.basePrice,
+              )}
             </p>
           </CardContent>
           <CardFooter className="justify-end border-slate-200">

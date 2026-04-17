@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: AuctionSettings = {
 
 const DEFAULT_AUCTION_DESCRIPTION = "No description provided by seller.";
 const DEFAULT_AUCTION_IMAGE_URL = "https://placehold.co/960x640/e2e8f0/1e293b?text=%3F";
+const EMAIL_NOTIFICATIONS_STORAGE_KEY = "bidhub-notifications-email";
 
 function ensureFirebaseReady(): void {
   if (!isFirebaseConfigured || !database) {
@@ -103,6 +104,10 @@ function parseActiveAuction(value: unknown): AuctionRecord | null {
     typeof record.currentHighestBidOwnerName === "string"
       ? record.currentHighestBidOwnerName
       : null;
+  const currentHighestBidOwnerEmail =
+    typeof record.currentHighestBidOwnerEmail === "string"
+      ? record.currentHighestBidOwnerEmail
+      : null;
   const startTime = typeof record.startTime === "number" ? record.startTime : 0;
   const endsAt = typeof record.endsAt === "number" ? record.endsAt : 0;
 
@@ -118,8 +123,10 @@ function parseActiveAuction(value: unknown): AuctionRecord | null {
     currentHighestBid,
     currentHighestBidOwnerId,
     currentHighestBidOwnerName,
+    currentHighestBidOwnerEmail,
     sellerId,
     sellerName,
+    sellerEmail: typeof record.sellerEmail === "string" ? record.sellerEmail : "",
     startTime,
     endsAt,
     status: "active",
@@ -216,8 +223,10 @@ export async function createAuction(input: CreateAuctionInput): Promise<string> 
     currentHighestBid: input.basePrice,
     currentHighestBidOwnerId: null,
     currentHighestBidOwnerName: null,
+    currentHighestBidOwnerEmail: null,
     sellerId: userId,
     sellerName,
+    sellerEmail: input.seller.email.trim(),
     startTime,
     endsAt,
     status: "active",
@@ -315,6 +324,7 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
       currentHighestBid: amount,
       currentHighestBidOwnerId: bidderId,
       currentHighestBidOwnerName: bidderName,
+      currentHighestBidOwnerEmail: input.bidder.email.trim(),
     };
   });
 
@@ -355,6 +365,9 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
         currentHighestBidOwnerName: previousBidderId
           ? (record.currentHighestBidOwnerName ?? null)
           : null,
+          currentHighestBidOwnerEmail: previousBidderId
+            ? (record.currentHighestBidOwnerEmail ?? null)
+            : null,
       };
     });
     throw error;
@@ -412,7 +425,11 @@ export async function finalizeExpiredAuctions(): Promise<void> {
       let winnerId: string | null = null;
       let winningAmount: number = 0;
       let sellerId: string | null = null;
+      let sellerEmail: string | null = null;
+      let winnerEmail: string | null = null;
+      let winnerName: string | null = null;
       let hasNoBidders = false;
+      let notificationsAlreadySent = false;
       let itemName = "";
       let sellerName = "";
       let basePrice = 0;
@@ -435,10 +452,14 @@ export async function finalizeExpiredAuctions(): Promise<void> {
         winnerId = record.currentHighestBidOwnerId as string | null;
         winningAmount = typeof record.currentHighestBid === "number" ? record.currentHighestBid : 0;
         sellerId = typeof record.sellerId === "string" ? record.sellerId : null;
+        sellerEmail = typeof record.sellerEmail === "string" ? record.sellerEmail : null;
+        winnerEmail = typeof record.currentHighestBidOwnerEmail === "string" ? record.currentHighestBidOwnerEmail : null;
+        winnerName = typeof record.currentHighestBidOwnerName === "string" ? record.currentHighestBidOwnerName : null;
         itemName = typeof record.itemName === "string" ? record.itemName : "";
         sellerName = typeof record.sellerName === "string" ? record.sellerName : "";
         basePrice = typeof record.basePrice === "number" ? record.basePrice : 0;
         startTime = typeof record.startTime === "number" ? record.startTime : 0;
+        notificationsAlreadySent = Boolean(record.notificationEmailsSentAt);
         
         hasNoBidders = !winnerId || winningAmount === basePrice;
 
@@ -484,6 +505,56 @@ export async function finalizeExpiredAuctions(): Promise<void> {
             await batch.commit();
           } catch (e) {
             console.error("Failed to process transaction for winning / selling users:", e);
+          }
+
+          if (!notificationsAlreadySent && winnerEmail && sellerEmail) {
+            const shouldSendEmailNotifications =
+              typeof window === "undefined" ||
+              window.localStorage.getItem(EMAIL_NOTIFICATIONS_STORAGE_KEY) === "true";
+
+            if (!shouldSendEmailNotifications) {
+              return;
+            }
+
+            try {
+              const response = await fetch("/api/auction-notifications", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  auctionId,
+                  itemName,
+                  sellerName,
+                  sellerEmail,
+                  winnerName: winnerName ?? "",
+                  winnerEmail,
+                  winningAmount,
+                }),
+              });
+
+              if (!response.ok) {
+                throw new Error("Email notification request failed.");
+              }
+
+              await runTransaction(auctionRef, (currentValue) => {
+                if (!currentValue || typeof currentValue !== "object") {
+                  return;
+                }
+
+                const currentRecord = currentValue as Record<string, unknown>;
+                if (currentRecord.notificationEmailsSentAt) {
+                  return;
+                }
+
+                return {
+                  ...currentRecord,
+                  notificationEmailsSentAt: Date.now(),
+                };
+              });
+            } catch (error) {
+              console.error("Failed to send auction end emails:", error);
+            }
           }
         }
 

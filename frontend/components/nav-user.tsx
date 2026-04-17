@@ -39,7 +39,7 @@ import { getUserInitials, getAvatarBackgroundColor, cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch"
 
 const IN_APP_KEY = "bidhub-notifications-in-app"
-const EMAIL_KEY = "bidhub-notifications-email"
+const BROWSER_KEY = "bidhub-notifications-browser"
 
 export function NavUser() {
   const { user, isLoading } = useCurrentUser()
@@ -47,14 +47,37 @@ export function NavUser() {
   const router = useRouter()
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = React.useState(false)
   const [isInAppEnabled, setIsInAppEnabled] = React.useState(true)
-  const [isEmailEnabled, setIsEmailEnabled] = React.useState(false)
+  const [isBrowserEnabled, setIsBrowserEnabled] = React.useState(false)
   const [isPreferenceReady, setIsPreferenceReady] = React.useState(false)
 
   React.useEffect(() => {
     setIsInAppEnabled(window.localStorage.getItem(IN_APP_KEY) !== "false")
-    setIsEmailEnabled(window.localStorage.getItem(EMAIL_KEY) === "true")
+    setIsBrowserEnabled(window.localStorage.getItem(BROWSER_KEY) === "true")
     setIsPreferenceReady(true)
   }, [])
+
+  React.useEffect(() => {
+    if (!isPreferenceReady || !isBrowserEnabled || typeof window === "undefined") {
+      return
+    }
+
+    if (!("Notification" in window)) {
+      setIsBrowserEnabled(false)
+      return
+    }
+
+    if (Notification.permission === "default") {
+      void Notification.requestPermission().then((permission) => {
+        if (permission !== "granted") {
+          setIsBrowserEnabled(false)
+        }
+      })
+    }
+
+    if (Notification.permission === "denied") {
+      setIsBrowserEnabled(false)
+    }
+  }, [isBrowserEnabled, isPreferenceReady])
 
   React.useEffect(() => {
     if (!isPreferenceReady) {
@@ -62,9 +85,9 @@ export function NavUser() {
     }
 
     window.localStorage.setItem(IN_APP_KEY, String(isInAppEnabled))
-    window.localStorage.setItem(EMAIL_KEY, String(isEmailEnabled))
+    window.localStorage.setItem(BROWSER_KEY, String(isBrowserEnabled))
     window.dispatchEvent(new CustomEvent("bidhub:notification-preferences-changed"))
-  }, [isEmailEnabled, isInAppEnabled, isPreferenceReady])
+  }, [isBrowserEnabled, isInAppEnabled, isPreferenceReady])
 
   if (isLoading || !user) {
     return (
@@ -168,7 +191,7 @@ export function NavUser() {
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold text-slate-900">Notification Preferences</DialogTitle>
             <DialogDescription className="text-xs text-slate-600">
-              Configure in-app and email alerts for auction results.
+              Configure in-app and browser alerts for auction results.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -181,10 +204,10 @@ export function NavUser() {
             </label>
             <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
               <div>
-                <p className="text-sm font-medium text-slate-900">Email notifications</p>
-                <p className="text-xs text-slate-600">Send winner and seller emails when an auction ends.</p>
+                <p className="text-sm font-medium text-slate-900">Browser notifications</p>
+                <p className="text-xs text-slate-600">Show native browser popups when an auction ends.</p>
               </div>
-              <Switch checked={isEmailEnabled} onCheckedChange={setIsEmailEnabled} />
+              <Switch checked={isBrowserEnabled} onCheckedChange={setIsBrowserEnabled} />
             </label>
           </div>
           <DialogFooter showCloseButton />

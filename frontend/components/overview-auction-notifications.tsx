@@ -22,6 +22,7 @@ interface AuctionNotificationSource {
 }
 
 const IN_APP_KEY = "bidhub-notifications-in-app"
+const BROWSER_KEY = "bidhub-notifications-browser"
 const FINALIZE_INTERVAL_MS = 5000
 
 function toAuction(id: string, value: unknown): AuctionNotificationSource | null {
@@ -73,15 +74,18 @@ export function OverviewAuctionNotifications() {
     role: "winner" | "seller"
   } | null>(null)
   const [isInAppEnabled, setIsInAppEnabled] = React.useState(true)
+  const [isBrowserEnabled, setIsBrowserEnabled] = React.useState(false)
   const previousStatusesRef = React.useRef<Record<string, AuctionNotificationSource["status"]>>({})
   const isInitializedRef = React.useRef(false)
   const shownTransitionIdsRef = React.useRef<Set<string>>(new Set())
 
   React.useEffect(() => {
     setIsInAppEnabled(window.localStorage.getItem(IN_APP_KEY) !== "false")
+    setIsBrowserEnabled(window.localStorage.getItem(BROWSER_KEY) === "true")
 
     const handlePreferenceChange = () => {
       setIsInAppEnabled(window.localStorage.getItem(IN_APP_KEY) !== "false")
+      setIsBrowserEnabled(window.localStorage.getItem(BROWSER_KEY) === "true")
     }
 
     window.addEventListener("bidhub:notification-preferences-changed", handlePreferenceChange)
@@ -102,7 +106,7 @@ export function OverviewAuctionNotifications() {
   }, [isLoading, user])
 
   React.useEffect(() => {
-    if (!isFirebaseConfigured || !database || isLoading || !user || !isInAppEnabled) {
+    if (!isFirebaseConfigured || !database || isLoading || !user || (!isInAppEnabled && !isBrowserEnabled)) {
       setNotification(null)
       return
     }
@@ -148,14 +152,32 @@ export function OverviewAuctionNotifications() {
 
       shownTransitionIdsRef.current.add(relevantAuction.id)
 
-      setNotification({
-        auction: relevantAuction,
-        role: relevantAuction.currentHighestBidOwnerId === user.id ? "winner" : "seller",
-      })
+      if (
+        isBrowserEnabled &&
+        typeof window !== "undefined" &&
+        "Notification" in window &&
+        Notification.permission === "granted"
+      ) {
+        const title = relevantAuction.currentHighestBidOwnerId === user.id
+          ? `You won ${relevantAuction.itemName}`
+          : `Auction ended: ${relevantAuction.itemName}`
+        const body = relevantAuction.currentHighestBidOwnerId === user.id
+          ? `Winning bid: $${relevantAuction.currentHighestBid.toLocaleString()}`
+          : `Winner: ${relevantAuction.currentHighestBidOwnerName ?? "No winner"}`
+
+        new Notification(title, { body })
+      }
+
+      if (isInAppEnabled) {
+        setNotification({
+          auction: relevantAuction,
+          role: relevantAuction.currentHighestBidOwnerId === user.id ? "winner" : "seller",
+        })
+      }
     })
 
     return () => unsubscribe()
-  }, [isLoading, isInAppEnabled, user])
+  }, [isBrowserEnabled, isLoading, isInAppEnabled, user])
 
   const handleClose = React.useCallback(() => {
     setNotification(null)

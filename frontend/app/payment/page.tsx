@@ -1,41 +1,74 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { doc, updateDoc, increment } from "firebase/firestore"
 import { db, auth } from "@/lib/firebase"
 import { useRouter } from "next/navigation"
 import { AuthGuard } from "@/components/auth-guard"
 import { useCurrentUser } from "@/hooks/use-current-user"
-import { loadStripe } from "@stripe/stripe-js"
-import {
-  Elements,
-  CardNumberElement,
-  CardExpiryElement,
-  CardCvcElement,
-  useStripe,
-  useElements
-} from "@stripe/react-stripe-js"
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 const usdAmountFormatter = new Intl.NumberFormat("en-US", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 })
 
 function PaymentForm() {
-  const stripe = useStripe()
-  const elements = useElements()
   const router = useRouter()
   const { user } = useCurrentUser()
 
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [nameOnCard, setNameOnCard] = useState("")
+  const [cardNumber, setCardNumber] = useState("")
+  const [expiry, setExpiry] = useState("")
+  const [cvv, setCvv] = useState("")
   const [amount, setAmount] = useState<string>("")
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 16)
+    const formatted = digits.replace(/(.{4})/g, "$1 ").trim()
+    setCardNumber(formatted)
+  }
+
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let digits = e.target.value.replace(/\D/g, "").slice(0, 4)
+    if (digits.length >= 1) {
+      const firstDigit = digits[0]
+      if (firstDigit > "1") {
+        digits = "0" + digits
+        digits = digits.slice(0, 4)
+      }
+    }
+    if (digits.length >= 2) {
+      const month = parseInt(digits.slice(0, 2), 10)
+      if (month < 1) {
+        digits = "01" + digits.slice(2)
+      } else if (month > 12) {
+        digits = "12" + digits.slice(2)
+      }
+    }
+    const formatted = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits
+    setExpiry(formatted)
+  }
+
+  const handleCvvChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "").slice(0, 4)
+    setCvv(digits)
+  }
+
+  const validateExpiry = (value: string): string | null => {
+    const match = value.match(/^(\d{2})\/(\d{2})$/)
+    if (!match) return "Expiration date must be in MM/YY format."
+    const month = parseInt(match[1], 10)
+    const year = 2000 + parseInt(match[2], 10)
+    if (month < 1 || month > 12) return "Invalid month."
+    const now = new Date()
+    const expiryDate = new Date(year, month, 0, 23, 59, 59)
+    if (expiryDate < now) return "Expiration date cannot be in the past."
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!stripe || !elements) return
-
     setPaymentLoading(true)
 
     try {
@@ -45,27 +78,29 @@ function PaymentForm() {
       }
 
       const numericAmount = Number(amount)
-      if (numericAmount <= 0) {
-        throw new Error("Amount must be greater than 0.")
-      }
-
-      const cardElement = elements.getElement(CardNumberElement)
-      if (!cardElement) {
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+        alert("Amount must be greater than 0.")
         setPaymentLoading(false)
         return
       }
 
-      const { error } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: cardElement,
-        billing_details: {
-          name: nameOnCard,
-        },
-      })
-
-      if (error) {
+      const digitsOnly = cardNumber.replace(/\s/g, "")
+      if (digitsOnly.length !== 16) {
+        alert("Card number must be exactly 16 digits.")
         setPaymentLoading(false)
-        alert(error.message || "An error occurred while validating your card.")
+        return
+      }
+
+      const expiryError = validateExpiry(expiry)
+      if (expiryError) {
+        alert(expiryError)
+        setPaymentLoading(false)
+        return
+      }
+
+      if (cvv.length < 3 || cvv.length > 4) {
+        alert("CVV must be 3 or 4 digits.")
+        setPaymentLoading(false)
         return
       }
 
@@ -82,12 +117,12 @@ function PaymentForm() {
         return
       }
 
-      alert("Stripe Payment Submitted Successfully! Balance updated.")
+      alert("Payment Submitted Successfully! Balance updated.")
       setAmount("")
       setNameOnCard("")
-      cardElement.clear()
-      elements.getElement(CardExpiryElement)?.clear()
-      elements.getElement(CardCvcElement)?.clear()
+      setCardNumber("")
+      setExpiry("")
+      setCvv("")
       router.push("/overview")
     } catch (error) {
       console.error("Payment error:", error)
@@ -98,27 +133,10 @@ function PaymentForm() {
   }
 
   const inputClass =
-    "flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base shadow-sm transition-colors focus-within:ring-2 focus-within:ring-slate-900 focus-within:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 text-slate-900 placeholder:text-slate-500 font-sans"
+    "flex h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-base shadow-sm transition-colors focus-within:ring-2 focus-within:ring-slate-900 focus-within:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 text-slate-900 placeholder:text-slate-500 font-sans outline-none"
 
   const labelClass = "text-[15px] font-semibold text-slate-900 mb-1.5"
   const subLabelClass = "text-[15px] text-slate-500"
-
-  const STRIPE_OPTIONS = {
-    style: {
-      base: {
-        fontSize: '16px',
-        color: '#0f172a',
-        fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        '::placeholder': {
-          color: '#64748b',
-        },
-      },
-      invalid: {
-        color: '#ef4444',
-        iconColor: '#ef4444',
-      },
-    },
-  }
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
@@ -134,7 +152,7 @@ function PaymentForm() {
           value={nameOnCard}
           onChange={(e) => setNameOnCard(e.target.value)}
           placeholder="John Doe"
-          className={inputClass + " outline-none"}
+          className={inputClass}
           required
         />
       </div>
@@ -142,31 +160,46 @@ function PaymentForm() {
       <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-4">
         <div className="flex flex-col">
           <label className={labelClass}>Card Number</label>
-          <div className={inputClass}>
-            <div className="w-full h-full flex items-center">
-              <CardNumberElement options={STRIPE_OPTIONS} className="w-full" />
-            </div>
-          </div>
-          <span className="text-sm text-slate-500 mt-1.5">Enter your 16-digit number.</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="cc-number"
+            value={cardNumber}
+            onChange={handleCardNumberChange}
+            placeholder="1234 5678 9012 3456"
+            className={inputClass}
+            required
+          />
+          <span className="text-sm text-slate-500 mt-1.5">Enter exactly 16 digits.</span>
         </div>
 
         <div className="flex flex-col">
           <label className={labelClass}>CVV</label>
-          <div className={inputClass}>
-            <div className="w-full h-full flex items-center">
-              <CardCvcElement options={STRIPE_OPTIONS} className="w-full" />
-            </div>
-          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="cc-csc"
+            value={cvv}
+            onChange={handleCvvChange}
+            placeholder="123"
+            className={inputClass}
+            required
+          />
         </div>
       </div>
 
       <div className="flex flex-col sm:w-1/2 sm:pr-2">
         <label className={labelClass}>Expiration Date</label>
-        <div className={inputClass}>
-          <div className="w-full h-full flex items-center">
-            <CardExpiryElement options={STRIPE_OPTIONS} className="w-full" />
-          </div>
-        </div>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="cc-exp"
+          value={expiry}
+          onChange={handleExpiryChange}
+          placeholder="MM/YY"
+          className={inputClass}
+          required
+        />
       </div>
 
       <div className="h-px w-full bg-slate-100 my-1" />
@@ -178,7 +211,7 @@ function PaymentForm() {
             Enter the amount you would like to add to your account.
           </p>
         </div>
-        
+
         {user && (
           <div className="flex items-center gap-6 p-4 bg-slate-100 rounded-xl mb-2 border border-slate-200">
             <div className="flex flex-col">
@@ -196,12 +229,12 @@ function PaymentForm() {
           <label className={labelClass}>Amount ($)</label>
           <input
             type="number"
-            min="1"
+            min="0.01"
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className={inputClass + " outline-none"}
+            className={inputClass}
             required
           />
         </div>
@@ -212,7 +245,7 @@ function PaymentForm() {
       <div className="flex items-center gap-3 mt-2">
         <button
           type="submit"
-          disabled={!stripe || paymentLoading}
+          disabled={paymentLoading}
           className="h-[42px] px-6 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition-colors disabled:opacity-50"
         >
           {paymentLoading ? "Processing..." : "Submit"}
@@ -236,9 +269,7 @@ export default function PaymentPage() {
     <AuthGuard>
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 sm:p-8 max-w-[500px] w-full mt-10 mb-10">
-          <Elements stripe={stripePromise}>
-            <PaymentForm />
-          </Elements>
+          <PaymentForm />
         </div>
       </div>
     </AuthGuard>

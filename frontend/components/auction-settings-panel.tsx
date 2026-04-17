@@ -170,21 +170,6 @@ export function AuctionSettingsPanel() {
                 />
                 Automatically restart auctions with no bids
               </label>
-
-              <label className="flex items-center gap-2 border border-slate-300 p-3 text-xs text-slate-900">
-                <input
-                  type="checkbox"
-                  disabled={!settings.autoRestartOnNoBid}
-                  checked={settings.changeStartingPriceOnRestart ?? false}
-                  onChange={(event) =>
-                    setSettings((previous) => ({
-                      ...previous,
-                      changeStartingPriceOnRestart: event.target.checked,
-                    }))
-                  }
-                />
-                Change starting price when restarting auctions
-              </label>
             </div>
           )}
 

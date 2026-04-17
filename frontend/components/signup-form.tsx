@@ -24,6 +24,8 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter();
+  const [firstName, setFirstName] = useState("");
+  const [surname, setSurname] = useState("");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,9 +37,18 @@ export function SignupForm({
     event.preventDefault();
     setErrorMessage(null);
 
+    const normalizedFirstName = firstName.trim();
+    const normalizedSurname = surname.trim();
     const normalizedUsername = username.trim().toLowerCase();
 
-    if (!normalizedUsername || !email.trim() || !password || !confirmPassword) {
+    if (
+      !normalizedFirstName ||
+      !normalizedSurname ||
+      !normalizedUsername ||
+      !email.trim() ||
+      !password ||
+      !confirmPassword
+    ) {
       setErrorMessage("Please complete all fields.");
       return;
     }
@@ -64,6 +75,8 @@ export function SignupForm({
     try {
       await registerWithEmailPassword(
         normalizedUsername,
+        normalizedFirstName,
+        normalizedSurname,
         email.trim(),
         password,
       );
@@ -96,6 +109,28 @@ export function SignupForm({
                   <AlertDescription>{errorMessage}</AlertDescription>
                 </Alert>
               ) : null}
+              <Field>
+                <FieldLabel htmlFor="firstName">Name</FieldLabel>
+                <Input
+                  id="firstName"
+                  type="text"
+                  placeholder="Jane"
+                  value={firstName}
+                  onChange={(event) => setFirstName(event.target.value)}
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="surname">Surname</FieldLabel>
+                <Input
+                  id="surname"
+                  type="text"
+                  placeholder="Doe"
+                  value={surname}
+                  onChange={(event) => setSurname(event.target.value)}
+                  required
+                />
+              </Field>
               <Field>
                 <FieldLabel htmlFor="username">Username</FieldLabel>
                 <Input
@@ -160,7 +195,7 @@ export function SignupForm({
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover dark:brightness-[0.2] dark:grayscale"
-              style={{ objectPosition: 'center 60%' }}
+              style={{ objectPosition: "center 60%" }}
             />
           </div>
         </CardContent>

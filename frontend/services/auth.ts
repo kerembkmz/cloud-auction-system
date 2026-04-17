@@ -11,10 +11,12 @@ import {
 import {
   collection,
   doc,
+  DocumentData,
   getDocs,
   getFirestore,
   limit,
   query,
+  QueryDocumentSnapshot,
   serverTimestamp,
   setDoc,
   where,
@@ -28,6 +30,43 @@ function normalizeUsername(username: string): string {
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function isEmailIdentifier(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+async function getUserByUsername(
+  username: string,
+): Promise<QueryDocumentSnapshot<DocumentData> | null> {
+  const db = getFirestore();
+  const usersRef = collection(db, "users");
+  const usernameQuery = query(
+    usersRef,
+    where("username", "==", normalizeUsername(username)),
+    limit(2),
+  );
+  const existingUsers = await getDocs(usernameQuery);
+
+  if (existingUsers.empty) {
+    return null;
+  }
+
+  return existingUsers.docs[0];
+}
+
+async function getUsersByEmail(
+  email: string,
+): Promise<QueryDocumentSnapshot<DocumentData>[]> {
+  const db = getFirestore();
+  const usersRef = collection(db, "users");
+  const emailQuery = query(
+    usersRef,
+    where("email", "==", normalizeEmail(email)),
+    limit(2),
+  );
+  const existingUsers = await getDocs(emailQuery);
+  return existingUsers.docs;
 }
 
 function getAuthErrorMessage(error: unknown): string {
@@ -69,13 +108,51 @@ export async function loginWithEmailPassword(
   email: string,
   password: string,
 ): Promise<void> {
+  await loginWithEmailOrUsername(email, password);
+}
+
+export async function loginWithEmailOrUsername(
+  identifier: string,
+  password: string,
+): Promise<void> {
   if (!isFirebaseConfigured) {
     throw new Error("Firebase is not configured. Add your env variables.");
   }
 
+  const normalizedIdentifier = identifier.trim();
+  if (!normalizedIdentifier) {
+    throw new Error("Please enter your email or username.");
+  }
+
+  let emailToSignIn = normalizedIdentifier;
+
+  if (isEmailIdentifier(normalizedIdentifier)) {
+    emailToSignIn = normalizeEmail(normalizedIdentifier);
+  } else {
+    const existingUser = await getUserByUsername(normalizedIdentifier);
+
+    if (!existingUser) {
+      throw new Error("No user exists with this username.");
+    }
+
+    const userData = existingUser.data();
+    if (
+      typeof userData.email !== "string" ||
+      userData.email.trim().length === 0
+    ) {
+      throw new Error("This account does not have a valid login email.");
+    }
+
+    emailToSignIn = normalizeEmail(userData.email);
+  }
+
   try {
     const auth = getAuth();
-    const credential = await signInWithEmailAndPassword(auth, email, password);
+    const credential = await signInWithEmailAndPassword(
+      auth,
+      emailToSignIn,
+      password,
+    );
 
     if (!credential.user.emailVerified) {
       await signOut(auth);
@@ -90,6 +167,8 @@ export async function loginWithEmailPassword(
 
 export async function registerWithEmailPassword(
   username: string,
+  firstName: string,
+  surname: string,
   email: string,
   password: string,
 ): Promise<void> {
@@ -98,6 +177,8 @@ export async function registerWithEmailPassword(
   }
 
   const normalizedUsername = normalizeUsername(username);
+  const normalizedFirstName = firstName.trim();
+  const normalizedSurname = surname.trim();
   const normalizedEmail = normalizeEmail(email);
 
   if (!/^[a-z0-9_]{3,20}$/.test(normalizedUsername)) {
@@ -108,6 +189,10 @@ export async function registerWithEmailPassword(
 
   if (!normalizedEmail) {
     throw new Error("Please enter a valid email address.");
+  }
+
+  if (!normalizedFirstName || !normalizedSurname) {
+    throw new Error("Please provide both name and surname.");
   }
 
   const db = getFirestore();
@@ -138,6 +223,8 @@ export async function registerWithEmailPassword(
         uid: user.uid,
         email: normalizedEmail,
         username: normalizedUsername,
+        firstName: normalizedFirstName,
+        surname: normalizedSurname,
         createdAt: serverTimestamp(),
         balance: 0,
         freezed_balance: {},
@@ -184,6 +271,40 @@ export async function sendPasswordReset(email: string): Promise<void> {
   } catch (error) {
     throw new Error(getAuthErrorMessage(error));
   }
+}
+
+export async function isUsernameAvailable(
+  username: string,
+  excludeUserId?: string,
+): Promise<boolean> {
+  const existingUser = await getUserByUsername(username);
+
+  if (!existingUser) {
+    return true;
+  }
+
+  if (!excludeUserId) {
+    return false;
+  }
+
+  return existingUser.id === excludeUserId;
+}
+
+export async function isEmailAvailable(
+  email: string,
+  excludeUserId?: string,
+): Promise<boolean> {
+  const existingUsers = await getUsersByEmail(email);
+
+  if (existingUsers.length === 0) {
+    return true;
+  }
+
+  if (!excludeUserId) {
+    return false;
+  }
+
+  return existingUsers.every((userDoc) => userDoc.id === excludeUserId);
 }
 
 export async function logout(): Promise<void> {

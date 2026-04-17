@@ -17,7 +17,11 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { loginWithEmailPassword, sendPasswordReset } from "@/services/auth";
+import { loginWithEmailOrUsername, sendPasswordReset } from "@/services/auth";
+
+function isEmailIdentifier(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 export function LoginForm({
   className,
@@ -27,7 +31,7 @@ export function LoginForm({
   const searchParams = useSearchParams();
   const isVerificationSent = searchParams.get("verification") === "sent";
   const redirectTo = searchParams.get("redirect") || "/overview";
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
@@ -39,8 +43,16 @@ export function LoginForm({
     setInfoMessage(null);
     setIsResetLoading(true);
 
+    const normalizedIdentifier = identifier.trim();
+
+    if (!isEmailIdentifier(normalizedIdentifier)) {
+      setErrorMessage("Enter your email address to reset your password.");
+      setIsResetLoading(false);
+      return;
+    }
+
     try {
-      await sendPasswordReset(email);
+      await sendPasswordReset(normalizedIdentifier);
       setInfoMessage("Password reset email sent. Please check your inbox.");
     } catch (error) {
       if (error instanceof Error) {
@@ -58,15 +70,15 @@ export function LoginForm({
     setErrorMessage(null);
     setInfoMessage(null);
 
-    if (!email.trim() || !password) {
-      setErrorMessage("Please enter your email and password.");
+    if (!identifier.trim() || !password) {
+      setErrorMessage("Please enter your email or username and password.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      await loginWithEmailPassword(email.trim(), password);
+      await loginWithEmailOrUsername(identifier.trim(), password);
       router.push(redirectTo);
     } catch (error) {
       if (error instanceof Error) {
@@ -88,7 +100,7 @@ export function LoginForm({
               <div className="flex flex-col items-center gap-2 text-center">
                 <h1 className="text-2xl font-bold">Welcome back</h1>
                 <p className="text-balance text-muted-foreground">
-                  Login to your Acme Inc account
+                  Login to your BidHub account
                 </p>
               </div>
               {isVerificationSent ? (
@@ -110,13 +122,13 @@ export function LoginForm({
                 </Alert>
               ) : null}
               <Field>
-                <FieldLabel htmlFor="email">Email</FieldLabel>
+                <FieldLabel htmlFor="identifier">Email or Username</FieldLabel>
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
+                  id="identifier"
+                  type="text"
+                  placeholder="m@example.com or auction_user"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
                   required
                 />
               </Field>
@@ -191,7 +203,7 @@ export function LoginForm({
               fill
               sizes="(min-width: 768px) 50vw, 100vw"
               className="object-cover dark:brightness-[0.2] dark:grayscale"
-              style={{ objectPosition: 'center 60%' }}
+              style={{ objectPosition: "center 60%" }}
             />
           </div>
         </CardContent>

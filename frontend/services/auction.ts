@@ -75,6 +75,8 @@ export async function saveAuctionSettings(settings: AuctionSettings): Promise<vo
       Math.max(1, Math.floor(settings.minDurationMinutes)),
       Math.floor(settings.maxDurationMinutes)
     ),
+    autoRestartOnNoBid: settings.autoRestartOnNoBid ?? true,
+    changeStartingPriceOnRestart: settings.changeStartingPriceOnRestart ?? false,
   };
 
   await set(ref(database, "config/auctionSettings"), nextSettings);

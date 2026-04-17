@@ -17,6 +17,10 @@ import {
 } from "@stripe/react-stripe-js"
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const usdAmountFormatter = new Intl.NumberFormat("en-US", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 function PaymentForm() {
   const stripe = useStripe()
@@ -179,12 +183,12 @@ function PaymentForm() {
           <div className="flex items-center gap-6 p-4 bg-slate-100 rounded-xl mb-2 border border-slate-200">
             <div className="flex flex-col">
               <span className="text-sm font-medium text-slate-500">Available Balance</span>
-              <span className="text-2xl font-bold text-slate-900">${(user.balance ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-2xl font-bold text-slate-900">${usdAmountFormatter.format(user.balance ?? 0)}</span>
             </div>
             <div className="w-px h-10 bg-slate-300"></div>
             <div className="flex flex-col">
               <span className="text-sm font-medium text-slate-500">Freezed Balance (Bids)</span>
-              <span className="text-2xl font-bold text-slate-900">${Object.values(user.freezed_balance ?? {}).reduce((sum, v) => sum + v, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-2xl font-bold text-slate-900">${usdAmountFormatter.format(Object.values(user.freezed_balance ?? {}).reduce((sum, v) => sum + v, 0))}</span>
             </div>
           </div>
         )}

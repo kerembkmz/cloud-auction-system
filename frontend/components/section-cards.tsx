@@ -39,7 +39,7 @@ const FALLBACK_AUCTIONS: Auction[] = [
     sellerId: "seller-camera",
     sellerName: "Camera Seller",
     currentHighestBid: 420,
-    endsAt: Date.now() + 1000 * 60 * 56,
+    endsAt: 0,
     status: "active",
   },
   {
@@ -50,7 +50,7 @@ const FALLBACK_AUCTIONS: Auction[] = [
     sellerId: "seller-keyboard",
     sellerName: "Keyboard Seller",
     currentHighestBid: 165,
-    endsAt: Date.now() + 1000 * 60 * 120,
+    endsAt: 0,
     status: "active",
   },
   {
@@ -61,10 +61,27 @@ const FALLBACK_AUCTIONS: Auction[] = [
     sellerId: "seller-records",
     sellerName: "Record Seller",
     currentHighestBid: 880,
-    endsAt: Date.now() + 1000 * 60 * 33,
+    endsAt: 0,
     status: "active",
   },
 ]
+
+function buildFallbackAuctions(baseNow: number): Auction[] {
+  return [
+    {
+      ...FALLBACK_AUCTIONS[0],
+      endsAt: baseNow + 1000 * 60 * 56,
+    },
+    {
+      ...FALLBACK_AUCTIONS[1],
+      endsAt: baseNow + 1000 * 60 * 120,
+    },
+    {
+      ...FALLBACK_AUCTIONS[2],
+      endsAt: baseNow + 1000 * 60 * 33,
+    },
+  ]
+}
 
 function toAuction(id: string, value: unknown): Auction | null {
   if (!value || typeof value !== "object") {
@@ -144,7 +161,7 @@ export function SectionCards() {
 
   React.useEffect(() => {
     if (!isFirebaseConfigured || !database) {
-      setAuctions(FALLBACK_AUCTIONS)
+      setAuctions(buildFallbackAuctions(Date.now()))
       setIsLoading(false)
       return
     }

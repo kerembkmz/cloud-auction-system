@@ -31,8 +31,11 @@ function toAuction(id: string, value: unknown): Auction | null {
       typeof record.currentHighestBidOwnerId === "string" ? record.currentHighestBidOwnerId : null,
     currentHighestBidOwnerName:
       typeof record.currentHighestBidOwnerName === "string" ? record.currentHighestBidOwnerName : null,
+    currentHighestBidOwnerEmail:
+      typeof record.currentHighestBidOwnerEmail === "string" ? record.currentHighestBidOwnerEmail : null,
     sellerId: typeof record.sellerId === "string" ? record.sellerId : "unknown-seller",
     sellerName: typeof record.sellerName === "string" ? record.sellerName : "Unknown seller",
+    sellerEmail: typeof record.sellerEmail === "string" ? record.sellerEmail : "",
     startTime: typeof record.startTime === "number" ? record.startTime : 0,
     endsAt: typeof record.endsAt === "number" ? record.endsAt : 0,
     status:

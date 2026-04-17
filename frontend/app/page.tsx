@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 
 import { LoginForm } from "@/components/login-form";
-import { Button } from "@/components/ui/button";
 
 export default function LoginPage() {
   return (
@@ -12,9 +11,12 @@ export default function LoginPage() {
           <LoginForm />
         </Suspense>
         <div className="mt-4 flex justify-center">
-          <Button asChild variant="outline" className="rounded-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50">
-            <Link href="/overview">Browse open auctions without logging in</Link>
-          </Button>
+          <Link
+            href="/overview"
+            className="inline-flex h-8 items-center justify-center rounded-full border border-slate-300 bg-white px-4 text-xs font-medium text-slate-900 transition hover:bg-slate-50"
+          >
+            Browse open auctions without logging in
+          </Link>
         </div>
       </div>
     </div>

@@ -15,6 +15,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -26,11 +34,35 @@ import { logout } from "@/services/auth"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { getUserInitials, getAvatarBackgroundColor, cn } from "@/lib/utils"
+import { Switch } from "@/components/ui/switch"
+
+const IN_APP_KEY = "bidhub-notifications-in-app"
+const EMAIL_KEY = "bidhub-notifications-email"
 
 export function NavUser() {
   const { user, isLoading } = useCurrentUser()
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] = React.useState(false)
+  const [isInAppEnabled, setIsInAppEnabled] = React.useState(true)
+  const [isEmailEnabled, setIsEmailEnabled] = React.useState(false)
+  const [isPreferenceReady, setIsPreferenceReady] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsInAppEnabled(window.localStorage.getItem(IN_APP_KEY) !== "false")
+    setIsEmailEnabled(window.localStorage.getItem(EMAIL_KEY) === "true")
+    setIsPreferenceReady(true)
+  }, [])
+
+  React.useEffect(() => {
+    if (!isPreferenceReady) {
+      return
+    }
+
+    window.localStorage.setItem(IN_APP_KEY, String(isInAppEnabled))
+    window.localStorage.setItem(EMAIL_KEY, String(isEmailEnabled))
+    window.dispatchEvent(new CustomEvent("bidhub:notification-preferences-changed"))
+  }, [isEmailEnabled, isInAppEnabled, isPreferenceReady])
 
   if (isLoading || !user) {
     return (
@@ -106,7 +138,7 @@ export function NavUser() {
                   Add Balance
                 </DropdownMenuItem>
               </Link>
-                <DropdownMenuItem onClick={() => router.push("/overview#notifications")}>
+                <DropdownMenuItem onClick={() => setIsNotificationDialogOpen(true)}>
                 <BellIcon
                 />
                 Notifications
@@ -129,6 +161,33 @@ export function NavUser() {
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+      <Dialog open={isNotificationDialogOpen} onOpenChange={setIsNotificationDialogOpen}>
+        <DialogContent className="border-slate-300 bg-white">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold text-slate-900">Notification Preferences</DialogTitle>
+            <DialogDescription className="text-xs text-slate-600">
+              Configure in-app and email alerts for auction results.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-900">In-app notifications</p>
+                <p className="text-xs text-slate-600">Show winner and seller alerts live in the app.</p>
+              </div>
+              <Switch checked={isInAppEnabled} onCheckedChange={setIsInAppEnabled} />
+            </label>
+            <label className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-900">Email notifications</p>
+                <p className="text-xs text-slate-600">Send winner and seller emails when an auction ends.</p>
+              </div>
+              <Switch checked={isEmailEnabled} onCheckedChange={setIsEmailEnabled} />
+            </label>
+          </div>
+          <DialogFooter showCloseButton />
+        </DialogContent>
+      </Dialog>
     </SidebarMenu>
   )
 }

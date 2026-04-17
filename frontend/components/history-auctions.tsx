@@ -10,6 +10,8 @@ import { database, isFirebaseConfigured } from "@/lib/firebase";
 import { finalizeExpiredAuctions } from "@/services/auction";
 import type { Auction } from "@/types/auction";
 
+const FINALIZE_INTERVAL_MS = 5000;
+
 function toAuction(id: string, value: unknown): Auction | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -60,6 +62,9 @@ export function HistoryAuctions() {
     }
 
     void finalizeExpiredAuctions();
+    const timer = window.setInterval(() => {
+      void finalizeExpiredAuctions();
+    }, FINALIZE_INTERVAL_MS);
 
     const auctionsRef = ref(database, "auctions");
     const unsubscribe = onValue(auctionsRef, (snapshot) => {
@@ -72,7 +77,10 @@ export function HistoryAuctions() {
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      window.clearInterval(timer);
+      unsubscribe();
+    };
   }, []);
 
   const inactiveAuctions = auctions.filter((auction) => auction.status === "inactive");

@@ -1,5 +1,5 @@
 import { get, push, ref, runTransaction, set } from "firebase/database";
-import { doc, runTransaction as runFirestoreTransaction, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
+import { doc, getDoc, runTransaction as runFirestoreTransaction, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
 
 import { database, db, isFirebaseConfigured } from "@/lib/firebase";
 import type { AuctionRecord, AuctionSettings } from "@/types/auction";
@@ -259,82 +259,103 @@ export async function placeBid(input: PlaceBidInput): Promise<void> {
   }
 
   const userRef = doc(db, "users", bidderId);
-  await runFirestoreTransaction(db, async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists()) {
-      throw new Error("User profile not found.");
-    }
-    const userData = userDoc.data();
-    const balance = userData.balance || 0;
-    if (balance < amount) {
-      throw new Error(`Insufficient balance. You have $${balance.toLocaleString()}, but need $${amount.toLocaleString()}.`);
-    }
-    transaction.update(userRef, {
-      balance: increment(-amount),
-      [`freezed_balance.${auctionId}`]: amount,
-    });
-  });
+  const userSnapshot = await getDoc(userRef);
+  if (!userSnapshot.exists()) {
+    throw new Error("User profile not found.");
+  }
+  const preBalance = (userSnapshot.data().balance as number) || 0;
+  if (preBalance < amount) {
+    throw new Error(
+      `Insufficient balance. You have $${preBalance.toLocaleString()}, but need $${amount.toLocaleString()}.`
+    );
+  }
 
   const auctionRef = ref(database, `auctions/${auctionId}`);
   let rejectionReason = "Unable to place bid.";
   let previousBidderId: string | null = null;
   let previousBidAmount: number = 0;
 
+  const result = await runTransaction(auctionRef, (currentValue) => {
+    if (!currentValue || typeof currentValue !== "object") {
+      rejectionReason = "Auction not found.";
+      return;
+    }
+
+    const record = currentValue as Record<string, unknown>;
+    const status = record.status;
+    const sellerId = typeof record.sellerId === "string" ? record.sellerId : "";
+    const endsAt = typeof record.endsAt === "number" ? record.endsAt : 0;
+    const currentHighestBid =
+      typeof record.currentHighestBid === "number"
+        ? record.currentHighestBid
+        : typeof record.basePrice === "number"
+          ? record.basePrice
+          : 0;
+
+    if (status !== "active" || endsAt <= Date.now()) {
+      rejectionReason = "This auction is no longer active.";
+      return;
+    }
+
+    if (sellerId === bidderId) {
+      rejectionReason = "You cannot bid on your own item.";
+      return;
+    }
+
+    if (amount <= currentHighestBid) {
+      rejectionReason = "Your bid was outpaced by another bidder. Please try again with a higher amount.";
+      return;
+    }
+
+    previousBidderId = record.currentHighestBidOwnerId as string | null;
+    previousBidAmount = currentHighestBid;
+
+    return {
+      ...record,
+      currentHighestBid: amount,
+      currentHighestBidOwnerId: bidderId,
+      currentHighestBidOwnerName: bidderName,
+    };
+  });
+
+  if (!result.committed) {
+    throw new Error(rejectionReason);
+  }
+
   try {
-    const result = await runTransaction(auctionRef, (currentValue) => {
+    await runFirestoreTransaction(db, async (transaction) => {
+      const userDoc = await transaction.get(userRef);
+      if (!userDoc.exists()) {
+        throw new Error("User profile not found.");
+      }
+      const balance = (userDoc.data().balance as number) || 0;
+      if (balance < amount) {
+        throw new Error(
+          `Insufficient balance. You have $${balance.toLocaleString()}, but need $${amount.toLocaleString()}.`
+        );
+      }
+      transaction.update(userRef, {
+        balance: increment(-amount),
+        [`freezed_balance.${auctionId}`]: amount,
+      });
+    });
+  } catch (error) {
+    await runTransaction(auctionRef, (currentValue) => {
       if (!currentValue || typeof currentValue !== "object") {
-        rejectionReason = "Auction not found.";
         return;
       }
-
       const record = currentValue as Record<string, unknown>;
-      const status = record.status;
-      const sellerId = typeof record.sellerId === "string" ? record.sellerId : "";
-      const endsAt = typeof record.endsAt === "number" ? record.endsAt : 0;
-      const currentHighestBid =
-        typeof record.currentHighestBid === "number"
-          ? record.currentHighestBid
-          : typeof record.basePrice === "number"
-            ? record.basePrice
-            : 0;
-
-      if (status !== "active" || endsAt <= Date.now()) {
-        rejectionReason = "This auction is no longer active.";
+      if (record.currentHighestBidOwnerId !== bidderId || record.currentHighestBid !== amount) {
         return;
       }
-
-      if (sellerId === bidderId) {
-        rejectionReason = "You cannot bid on your own item.";
-        return;
-      }
-
-      if (amount <= currentHighestBid) {
-        rejectionReason = "Bid must be higher than current highest bid.";
-        return;
-      }
-
-      previousBidderId = record.currentHighestBidOwnerId as string | null;
-      previousBidAmount = currentHighestBid;
-
       return {
         ...record,
-        currentHighestBid: amount,
-        currentHighestBidOwnerId: bidderId,
-        currentHighestBidOwnerName: bidderName,
+        currentHighestBid: previousBidAmount,
+        currentHighestBidOwnerId: previousBidderId,
+        currentHighestBidOwnerName: previousBidderId
+          ? (record.currentHighestBidOwnerName ?? null)
+          : null,
       };
-    });
-
-    if (!result.committed) {
-      await updateDoc(userRef, {
-        balance: increment(amount),
-        [`freezed_balance.${auctionId}`]: deleteField(),
-      });
-      throw new Error(rejectionReason);
-    }
-  } catch (error) {
-    await updateDoc(userRef, {
-      balance: increment(amount),
-      [`freezed_balance.${auctionId}`]: deleteField(),
     });
     throw error;
   }

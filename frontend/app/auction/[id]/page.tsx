@@ -233,7 +233,7 @@ export default function AuctionDetailsPage() {
             </CardHeader>
             <CardContent className="space-y-2 text-xs text-slate-700">
               <p>
-                Seller: {auction.sellerName} ({auction.sellerId})
+                Seller: {auction.sellerName}
               </p>
               <p>Status: {auction.status}</p>
               <p>
@@ -257,7 +257,6 @@ export default function AuctionDetailsPage() {
                 ) : currentUser ? (
                   <>
                     <p>{currentUser.name}</p>
-                    <p className="text-slate-600">{currentUser.id}</p>
                   </>
                 ) : (
                   <p>Please log in to place a bid.</p>
